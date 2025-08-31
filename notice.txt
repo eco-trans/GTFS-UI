@@ -1,4 +1,5 @@
 1- Columbus, Ohio PT's RT feed is in stale state since 23rd Aug 2025. https://www.cota.com/data/
 2- Auburn, Alabama PT's has no GTFS
 3- Atlanta, Georgia is not working either. it is showing 403 (unauthorized access) and timeout all the times. https://itsmarta.com/app-developer-resources.aspx
-4- Chicago has not GTFS RT feed but they have proprietary API for that. https://www.transitchicago.com/developers/gtfs/
+4- Chicago, Illinois has not GTFS RT feed but they have proprietary API for that. https://www.transitchicago.com/developers/gtfs/
+5- 
