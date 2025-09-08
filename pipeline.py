@@ -75,7 +75,7 @@ def extract_schedule():
     zip_paths = glob(os.path.join("schedules", "zips", "*.zip"))
     for path in zip_paths:
         name = path.split(os.path.sep)[-1].split(".")[0]
-        dir_path = os.path.join("schedules", "zips", name)
+        dir_path = os.path.join("schedules", name)
         if os.path.isdir(dir_path):
             shutil.rmtree('dir_path')
         os.makedirs(dir_path, exist_ok=True)
@@ -86,6 +86,11 @@ def extract_schedule():
         except:
             print("Name: ", name, " is corrupted")
 
+
+def push_schedules():
+    pass
+
+
 if __name__ == "__main__":
-    get_schedules()
+    # get_schedules()
     extract_schedule()
