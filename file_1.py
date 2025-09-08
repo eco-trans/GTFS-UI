@@ -55,23 +55,16 @@ def get_schedules():
                 except:
                     content_decoded = response.content.decode('utf-8-sig')
                     json_respose = json.loads(content_decoded)
-                
                     # print([i["Id"] for i in json_respose])
 
                 # schedule_urls[(_id, key)] = data.format(transit_system["api_key"], )
                 # WAITING FOR THE RESPONCE FROM 511
 
-
             for (_id, operator), link in schedule_urls.items():
                 response = requests.get(link)
                 with open(os.path.join("schedules", "zips", f"{_id}_{operator}.zip"), 'wb') as f:
                     f.write(response.content)
-                
-
-        # schedule_urls[_id] = url
-
     client.close()
-    return schedule_urls
 
-if __name__ == "__main__":
-    get_schedules()
+# if __name__ == "__main__":
+    # get_schedules()
