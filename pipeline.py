@@ -1,8 +1,13 @@
 import os
-from dotenv import load_dotenv
-from pymongo import MongoClient
-import requests
+from glob import glob
+import shutil
 import json
+
+import requests
+import zipfile
+from pymongo import MongoClient
+from dotenv import load_dotenv
+
 
 def get_connection():
     load_dotenv()
@@ -62,9 +67,25 @@ def get_schedules():
 
             for (_id, operator), link in schedule_urls.items():
                 response = requests.get(link)
-                with open(os.path.join("schedules", "zips", f"{_id}_{operator}.zip"), 'wb') as f:
+                with open(os.path.join("schedules", "zips", f"{_id}___{operator}.zip"), 'wb') as f:
                     f.write(response.content)
     client.close()
 
-# if __name__ == "__main__":
-    # get_schedules()
+def extract_schedule():
+    zip_paths = glob(os.path.join("schedules", "zips", "*.zip"))
+    for path in zip_paths:
+        name = path.split(os.path.sep)[-1].split(".")[0]
+        dir_path = os.path.join("schedules", "zips", name)
+        if os.path.isdir(dir_path):
+            shutil.rmtree('dir_path')
+        os.makedirs(dir_path, exist_ok=True)
+        
+        try:
+            with zipfile.ZipFile(path, 'r') as zip_ref:
+                zip_ref.extractall(dir_path)
+        except:
+            print("Name: ", name, " is corrupted")
+
+if __name__ == "__main__":
+    get_schedules()
+    extract_schedule()
