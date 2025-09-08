@@ -18,3 +18,5 @@ collections = [c1n, c2n, c3n, c4n]
 for collection in collections:
     if collection not in db.list_collection_names():
         db.create_collection(collection)
+
+os.makedirs("schedules/zips", exist_ok=True)
