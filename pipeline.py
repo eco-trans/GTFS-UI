@@ -1,30 +1,25 @@
 import os
+import time
 from glob import glob
 import shutil
 import json
 
 import requests
 import zipfile
-from pymongo import MongoClient
-from dotenv import load_dotenv
+from bson.objectid import ObjectId
+import pandas as pd
+from tqdm import tqdm
 
-
-def get_connection():
-    load_dotenv()
-    database_url = os.getenv("DATABASE_URL")
-    db_name = os.getenv("DB_NAME")
-    client = MongoClient(database_url)
-    db = client[db_name]
-    return client, db
+from initialize_db import get_connection, get_sch_db_name
 
 def get_schedules():
     client, db = get_connection()
-    ts_name = os.getenv("COLLECTION_1_NAME") #ts stands for transit systems
+    ts_name = os.getenv("METADATA_COLLECTION_NAME") #ts stands for transit systems
     ts_cursor = db[ts_name]
 
     schedule_urls = {}
     for transit_system in ts_cursor.find({}):
-        _id = transit_system["_id"]
+        _id = get_sch_db_name(transit_system)#transit_system["_id"]
         data = transit_system["schedule"]
 
         if "schedule_needs_key" not in transit_system:
@@ -88,9 +83,29 @@ def extract_schedule():
 
 
 def push_schedules():
-    pass
+    timestamp = time.time()
+    client, db = get_connection()
+    schedule_vars = os.getenv("SECHDULE_VARS").split(",")
 
+    paths = glob(os.path.join("schedules", "*/"))
+    for path in paths:
+        if "zips" in path:
+            continue
+
+        db_name = path.strip(os.path.sep).split(os.path.sep)[-1].split("___")[0]
+        operator = path.strip(os.path.sep).split(os.path.sep)[-1].split("___")[-1]
+        db = client[db_name]
+
+        for text_file in tqdm(os.listdir(path)):
+            var_name = text_file.split(os.path.sep)[-1].split(".")[0]
+            if var_name in schedule_vars:
+                frame = pd.read_csv(os.path.join(path, text_file))
+                for _, row in frame.iterrows():
+                    db[f"{timestamp}___{operator}___{var_name}"].insert_one(row.to_dict())
+
+    client.close()
 
 if __name__ == "__main__":
-    # get_schedules()
+    get_schedules()
     extract_schedule()
+    push_schedules()
