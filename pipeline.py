@@ -4,23 +4,24 @@ from glob import glob
 import shutil
 import json
 
-import requests
+import aiohttp
 import zipfile
-from bson.objectid import ObjectId
 import pandas as pd
-from tqdm import tqdm
+import asyncio
+from tqdm.asyncio import tqdm_asyncio
 
-from initialize_db import get_connection, get_sch_db_name
+from initialize_db import get_async_connection, get_sch_db_name
 
-def get_schedules():
-    client, db = get_connection()
-    ts_name = os.getenv("METADATA_COLLECTION_NAME") #ts stands for transit systems
+async def get_schedules():
+    client, db = await get_async_connection()
+    ts_name = os.getenv("METADATA_COLLECTION_NAME")  # ts stands for transit systems
     ts_cursor = db[ts_name]
 
     schedule_urls = {}
-    for transit_system in ts_cursor.find({}):
-        _id = get_sch_db_name(transit_system)#transit_system["_id"]
-        data = transit_system["schedule"]
+
+    async for transit_system in ts_cursor.find({}):
+        _id = get_sch_db_name(transit_system)  # transit_system["_id"]
+        data = transit_system.get("schedule")
 
         if "schedule_needs_key" not in transit_system:
             transit_system["schedule_needs_key"] = False
@@ -48,23 +49,38 @@ def get_schedules():
                 operator_endpoint = transit_system["operators_endpoints"]
                 if "={}" in operator_endpoint:
                     operator_endpoint = operator_endpoint.format(transit_system["api_key"])
-                
-                response = requests.get(operator_endpoint)
-                try:
-                    json_respose = response.json()
-                except:
-                    content_decoded = response.content.decode('utf-8-sig')
-                    json_respose = json.loads(content_decoded)
-                    # print([i["Id"] for i in json_respose])
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(operator_endpoint) as response:
+                        try:
+                            json_respose = await response.json()
+                        except:
+                            content_decoded = await response.text(encoding="utf-8-sig")
+                            json_respose = json.loads(content_decoded)
+                            # print([i["Id"] for i in json_respose])
 
                 # schedule_urls[(_id, key)] = data.format(transit_system["api_key"], )
                 # WAITING FOR THE RESPONCE FROM 511
 
-            for (_id, operator), link in schedule_urls.items():
-                response = requests.get(link)
-                with open(os.path.join("schedules", "zips", f"{_id}___{operator}.zip"), 'wb') as f:
-                    f.write(response.content)
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for (_id, operator), link in schedule_urls.items():
+            tasks.append(download_zip(session, _id, operator, link))
+
+        await asyncio.gather(*tasks)
     client.close()
+
+
+async def download_zip(session, _id, operator, link):
+    async with session.get(link) as response:
+        content = await response.read()
+        filepath = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
+        await asyncio.to_thread(write_file, filepath, content)
+
+def write_file(filepath, content):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "wb") as f:
+        f.write(content)
 
 def extract_schedule():
     zip_paths = glob(os.path.join("schedules", "zips", "*.zip"))
@@ -81,31 +97,56 @@ def extract_schedule():
         except:
             print("Name: ", name, " is corrupted")
 
+async def insert_frame(db, collection_name, frame: pd.DataFrame):
+    docs = frame.to_dict("records")
+    if docs:
+        await db[collection_name].insert_many(docs)
 
-def push_schedules():
+async def process_file(path, text_file, db, operator, schedule_vars, timestamp):
+    var_name = os.path.splitext(text_file)[0]
+    if var_name not in schedule_vars:
+        return
+
+    frame = await asyncio.to_thread(
+        pd.read_csv, os.path.join(path, text_file)
+    )
+
+    collection_name = f"{timestamp}___{operator}___{var_name}"
+    await insert_frame(db, collection_name, frame)
+
+async def push_schedules():
     timestamp = time.time()
-    client, db = get_connection()
-    schedule_vars = os.getenv("SECHDULE_VARS").split(",")
+    client, db = await get_async_connection()
+    schedule_vars = os.getenv("SCHEDULE_VARS").split(",")
 
     paths = glob(os.path.join("schedules", "*/"))
+    tasks = []
+
     for path in paths:
         if "zips" in path:
             continue
 
-        db_name = path.strip(os.path.sep).split(os.path.sep)[-1].split("___")[0]
-        operator = path.strip(os.path.sep).split(os.path.sep)[-1].split("___")[-1]
+        db_name = os.path.basename(path.strip(os.path.sep)).split("___")[0]
+        operator = os.path.basename(path.strip(os.path.sep)).split("___")[-1]
         db = client[db_name]
 
-        for text_file in tqdm(os.listdir(path)):
-            var_name = text_file.split(os.path.sep)[-1].split(".")[0]
-            if var_name in schedule_vars:
-                frame = pd.read_csv(os.path.join(path, text_file))
-                for _, row in frame.iterrows():
-                    db[f"{timestamp}___{operator}___{var_name}"].insert_one(row.to_dict())
+        for text_file in os.listdir(path):
+            tasks.append(
+                process_file(path, text_file, db, operator, schedule_vars, timestamp)
+            )
+
+    for f in tqdm_asyncio.as_completed(tasks):
+        await f
 
     client.close()
 
 if __name__ == "__main__":
-    get_schedules()
+    start = time.time()
+    asyncio.run(get_schedules())
+    print(f"----- Schedules downloaded in {(time.time()-start)/60. :.4f} minutes -----")
+    start = time.time()
     extract_schedule()
-    push_schedules()
+    print(f"----- Schedules extracted in {(time.time()-start)/60. :.4f} minutes -----")
+    start = time.time()
+    asyncio.run(push_schedules())
+    print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
