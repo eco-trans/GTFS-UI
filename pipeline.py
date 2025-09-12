@@ -9,8 +9,10 @@ import zipfile
 import pandas as pd
 import asyncio
 from tqdm.asyncio import tqdm_asyncio
+import hashlib
 
 from initialize_db import get_async_connection, get_sch_db_name
+
 
 async def get_schedules():
     client, db = await get_async_connection()
@@ -69,12 +71,13 @@ async def get_schedules():
 
         await asyncio.gather(*tasks)
     client.close()
+    return schedule_urls
 
 
 async def download_zip(session, _id, operator, link):
     async with session.get(link) as response:
         content = await response.read()
-        filepath = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
+        filepath = os.path.join("schedules", "temps", f"{_id}___{operator}.zip")
         await asyncio.to_thread(write_file, filepath, content)
 
 def write_file(filepath, content):
@@ -88,7 +91,7 @@ def extract_schedule():
         name = path.split(os.path.sep)[-1].split(".")[0]
         dir_path = os.path.join("schedules", name)
         if os.path.isdir(dir_path):
-            shutil.rmtree('dir_path')
+            shutil.rmtree(dir_path)
         os.makedirs(dir_path, exist_ok=True)
         
         try:
@@ -140,13 +143,45 @@ async def push_schedules():
 
     client.close()
 
-if __name__ == "__main__":
+def get_sha256_hash(file_path):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+def check_if_updated(_id, operator):
+    temp_filepath = os.path.join("schedules", "temps", f"{_id}___{operator}.zip")
+    prev_filepath = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
+    if not os.path.isfile(prev_filepath):
+        os.rename(temp_filepath, prev_filepath)
+        return True
+    else:
+        if get_sha256_hash(temp_filepath) == get_sha256_hash(prev_filepath):
+            os.remove(temp_filepath)
+            return False
+        else:
+            os.remove(prev_filepath)
+            os.rename(temp_filepath, prev_filepath)
+            return True
+
+async def update_schedules():
     start = time.time()
-    asyncio.run(get_schedules())
+    schedule_urls = await get_schedules()
     print(f"----- Schedules downloaded in {(time.time()-start)/60. :.4f} minutes -----")
-    start = time.time()
-    extract_schedule()
-    print(f"----- Schedules extracted in {(time.time()-start)/60. :.4f} minutes -----")
-    start = time.time()
-    asyncio.run(push_schedules())
-    print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
+
+    for (_id, operator), _ in schedule_urls.items():
+        is_updated = check_if_updated(_id, operator)
+        print(f"Is {_id}___{operator} updated: ", is_updated)
+
+        if is_updated:
+            start = time.time()
+            extract_schedule()
+            print(f"----- Schedules extracted in {(time.time()-start)/60. :.4f} minutes -----")
+            start = time.time()
+            await push_schedules()
+            print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
+
+
+if __name__ == "__main__":
+    asyncio.run(update_schedules())

@@ -48,5 +48,6 @@ def delete_added_schedules():
 
 if __name__ == "__main__":
     os.makedirs("schedules/zips", exist_ok=True)
+    os.makedirs("schedules/temps", exist_ok=True)
     delete_added_schedules()
     ini_db()
