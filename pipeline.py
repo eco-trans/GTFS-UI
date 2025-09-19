@@ -2,7 +2,6 @@ import os
 import time
 from glob import glob
 import shutil
-import json
 
 import aiohttp
 import zipfile
@@ -10,8 +9,10 @@ import pandas as pd
 import asyncio
 from tqdm.asyncio import tqdm_asyncio
 import hashlib
+import gtfs_realtime_pb2
 
-from initialize_db import get_async_connection, get_sch_db_name
+from initialize_db import get_async_connection, get_sch_db_name, get_rt_db_name
+from google.protobuf.json_format import MessageToDict
 
 
 async def get_schedules():
@@ -48,21 +49,7 @@ async def get_schedules():
             elif not transit_system["schedule_needs_oid"]:
                 schedule_urls[(_id, None)] = data.format(transit_system["api_key"])
             else:
-                operator_endpoint = transit_system["operators_endpoints"]
-                if "={}" in operator_endpoint:
-                    operator_endpoint = operator_endpoint.format(transit_system["api_key"])
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(operator_endpoint) as response:
-                        try:
-                            json_respose = await response.json()
-                        except:
-                            content_decoded = await response.text(encoding="utf-8-sig")
-                            json_respose = json.loads(content_decoded)
-                            # print([i["Id"] for i in json_respose])
-
-                # schedule_urls[(_id, key)] = data.format(transit_system["api_key"], )
-                # WAITING FOR THE RESPONCE FROM 511
+                schedule_urls[(_id, None)] = data.format(transit_system["api_key"], transit_system["agency"])
 
     async with aiohttp.ClientSession() as session:
         tasks = []
@@ -183,5 +170,94 @@ async def update_schedules():
             print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
 
 
+def flatten_dict(data, parent_key='', sep='__'):
+    items = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+    elif isinstance(data, list):
+        for i, v in enumerate(data, 0):
+            new_key = f"{parent_key}_{i}"
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+    else:
+        items.append((parent_key, data))
+    return dict(items)
+
+async def fetch_rt_feed(url, headers, session):
+    async with session.get(url, headers=headers) as response:
+        if response.status != 200:
+            print(url, headers)
+            raise RuntimeError(f"Bad status {response.status}: {await response.text()}")
+        return await response.read()
+
+async def stream_rt_data():
+    client, db = await get_async_connection()
+    ts_name = os.getenv("METADATA_COLLECTION_NAME")  # ts stands for transit systems
+    ts_cursor = db[ts_name]
+
+    responses = []
+    id_var_pairs = []
+    async with aiohttp.ClientSession() as session:
+        async for transit_system in ts_cursor.find({}):
+            _id = get_rt_db_name(transit_system)
+            data = transit_system.get("realtime")
+            is_key_needed = transit_system.get("rt_needs_key")
+            is_oid_needed = transit_system.get("rt_needs_oid")
+
+            api_key = transit_system.get("api_key")
+            agency = transit_system.get("agency")
+
+            for var_name, link in data.items():
+                if len(link) == 0:
+                    continue
+
+                if is_key_needed and is_oid_needed:
+                    url = link.format(api_key, agency)
+
+                elif is_key_needed:
+                    url = link.format(api_key)
+
+                elif is_oid_needed:
+                    url = link.format(agency)
+                else:
+                    url = link
+
+                if api_key is not None:
+                    headers = {
+                        'Authorization': api_key,
+                    }
+                else:
+                    headers = None
+                
+                try:
+                    response = fetch_rt_feed(url, headers, session)
+                    responses.append(response)
+                    id_var_pairs.append((_id, var_name))
+                except:
+                    continue
+        
+        responses = await asyncio.gather(*responses) # required session context 
+
+    for (_id, var_name), response in zip(id_var_pairs, responses):
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.ParseFromString(response)
+        dict_feed = MessageToDict(feed, preserving_proto_field_name=True)
+        
+        entities = dict_feed["entity"]
+        for e in entities:
+            n_entity = {}
+            for k, v in e.items():
+                if isinstance(v, dict):
+                    n_entity.update(flatten_dict(v))
+                else:
+                    n_entity[str(k)+"__muk"] = v
+
+            n_db = client[_id]
+            collection = n_db[var_name]
+            collection.insert_one(n_entity)
+
 if __name__ == "__main__":
     asyncio.run(update_schedules())
+    asyncio.run(stream_rt_data())
+
