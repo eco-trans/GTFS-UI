@@ -169,7 +169,6 @@ async def update_schedules():
             await push_schedules()
             print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
 
-
 def flatten_dict(data, parent_key='', sep='__'):
     items = []
     if isinstance(data, dict):
@@ -183,6 +182,28 @@ def flatten_dict(data, parent_key='', sep='__'):
     else:
         items.append((parent_key, data))
     return dict(items)
+
+def infer_dtypes(data: dict):
+    typed_data = {}
+    for k, v in data.items():
+        if isinstance(v, str):
+            if ":" in v:
+                typed_data[k] = v
+            elif "_date" in k:
+                typed_data[k] = f"{v[:4]}-{v[4:6]}-{v[6:]}"
+
+            elif not v.isalnum():
+                continue
+            else:
+                try:
+                    typed_data[k] = int(v)
+                except:
+                    typed_data[k] = v
+        else:
+            typed_data[k] = v
+
+    return typed_data
+
 
 async def fetch_rt_feed(url, headers, session):
     async with session.get(url, headers=headers) as response:
@@ -249,7 +270,7 @@ async def stream_rt_data():
             n_entity = {}
             for k, v in e.items():
                 if isinstance(v, dict):
-                    n_entity.update(flatten_dict(v))
+                    n_entity.update(infer_dtypes(flatten_dict(v)))
                 else:
                     n_entity[str(k)+"__muk"] = v
 
@@ -258,6 +279,6 @@ async def stream_rt_data():
             collection.insert_one(n_entity)
 
 if __name__ == "__main__":
-    asyncio.run(update_schedules())
+    # asyncio.run(update_schedules())
     asyncio.run(stream_rt_data())
 
