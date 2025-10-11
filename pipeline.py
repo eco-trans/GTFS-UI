@@ -72,20 +72,34 @@ def write_file(filepath, content):
     with open(filepath, "wb") as f:
         f.write(content)
 
-def extract_schedule():
-    zip_paths = glob(os.path.join("schedules", "zips", "*.zip"))
-    for path in zip_paths:
-        name = path.split(os.path.sep)[-1].split(".")[0]
-        dir_path = os.path.join("schedules", name)
-        if os.path.isdir(dir_path):
-            shutil.rmtree(dir_path)
-        os.makedirs(dir_path, exist_ok=True)
+# def extract_schedule():
+#     zip_paths = glob(os.path.join("schedules", "zips", "*.zip"))
+#     for path in zip_paths:
+#         name = path.split(os.path.sep)[-1].split(".")[0]
+#         dir_path = os.path.join("schedules", name)
+#         if os.path.isdir(dir_path):
+#             shutil.rmtree(dir_path)
+#         os.makedirs(dir_path, exist_ok=True)
         
-        try:
-            with zipfile.ZipFile(path, 'r') as zip_ref:
-                zip_ref.extractall(dir_path)
-        except:
-            print("Name: ", name, " is corrupted")
+#         try:
+#             with zipfile.ZipFile(path, 'r') as zip_ref:
+#                 zip_ref.extractall(dir_path)
+#         except:
+#             print("Name: ", name, " is corrupted")
+
+def extract_schedule(_id, operator):
+    path = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
+    name = path.split(os.path.sep)[-1].split(".")[0]
+    dir_path = os.path.join("schedules", name)
+    if os.path.isdir(dir_path):
+        shutil.rmtree(dir_path)
+    os.makedirs(dir_path, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(path, 'r') as zip_ref:
+            zip_ref.extractall(dir_path)
+    except:
+        print("Name: ", name, " is corrupted")
 
 async def insert_frame(db, collection_name, frame: pd.DataFrame):
     docs = frame.to_dict("records")
@@ -104,26 +118,47 @@ async def process_file(path, text_file, db, operator, schedule_vars, timestamp):
     collection_name = f"{timestamp}___{operator}___{var_name}"
     await insert_frame(db, collection_name, frame)
 
-async def push_schedules():
+# async def push_schedules():
+#     timestamp = time.time()
+#     client, db = await get_async_connection()
+#     schedule_vars = os.getenv("SCHEDULE_VARS").split(",")
+
+#     paths = glob(os.path.join("schedules", "*/"))
+#     tasks = []
+
+#     for path in paths:
+#         if "zips" in path:
+#             continue
+
+#         db_name = os.path.basename(path.strip(os.path.sep)).split("___")[0]
+#         operator = os.path.basename(path.strip(os.path.sep)).split("___")[-1]
+#         db = client[db_name]
+
+#         for text_file in os.listdir(path):
+#             tasks.append(
+#                 process_file(path, text_file, db, operator, schedule_vars, timestamp)
+#             )
+
+#     for f in tqdm_asyncio.as_completed(tasks):
+#         await f
+
+#     client.close()
+
+async def push_schedules(_id, operator):
     timestamp = time.time()
     client, db = await get_async_connection()
     schedule_vars = os.getenv("SCHEDULE_VARS").split(",")
-
-    paths = glob(os.path.join("schedules", "*/"))
+    path = os.path.join("schedules", f"{_id}___{operator}")
     tasks = []
+    
+    db_name = os.path.basename(path.strip(os.path.sep)).split("___")[0]
+    operator = os.path.basename(path.strip(os.path.sep)).split("___")[-1]
+    db = client[db_name]
 
-    for path in paths:
-        if "zips" in path:
-            continue
-
-        db_name = os.path.basename(path.strip(os.path.sep)).split("___")[0]
-        operator = os.path.basename(path.strip(os.path.sep)).split("___")[-1]
-        db = client[db_name]
-
-        for text_file in os.listdir(path):
-            tasks.append(
-                process_file(path, text_file, db, operator, schedule_vars, timestamp)
-            )
+    for text_file in os.listdir(path):
+        tasks.append(
+            process_file(path, text_file, db, operator, schedule_vars, timestamp)
+        )
 
     for f in tqdm_asyncio.as_completed(tasks):
         await f
@@ -163,10 +198,10 @@ async def update_schedules():
 
         if is_updated:
             start = time.time()
-            extract_schedule()
+            extract_schedule(_id, operator)
             print(f"----- Schedules extracted in {(time.time()-start)/60. :.4f} minutes -----")
             start = time.time()
-            await push_schedules()
+            await push_schedules(_id, operator)
             print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
 
 def flatten_dict(data, parent_key='', sep='__'):
@@ -264,7 +299,8 @@ async def stream_rt_data():
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(response)
         dict_feed = MessageToDict(feed, preserving_proto_field_name=True)
-        
+        if "entity" not in dict_feed:
+            continue
         entities = dict_feed["entity"]
         for e in entities:
             n_entity = {}
@@ -276,9 +312,10 @@ async def stream_rt_data():
 
             n_db = client[_id]
             collection = n_db[var_name]
-            collection.insert_one(n_entity)
+            await collection.insert_one(n_entity)
+
 
 if __name__ == "__main__":
-    # asyncio.run(update_schedules())
+    asyncio.run(update_schedules())
     asyncio.run(stream_rt_data())
 

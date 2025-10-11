@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
-
 def get_connection():
     load_dotenv()
     database_url = os.getenv("DATABASE_URL")
