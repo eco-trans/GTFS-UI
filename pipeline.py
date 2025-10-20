@@ -72,20 +72,6 @@ def write_file(filepath, content):
     with open(filepath, "wb") as f:
         f.write(content)
 
-# def extract_schedule():
-#     zip_paths = glob(os.path.join("schedules", "zips", "*.zip"))
-#     for path in zip_paths:
-#         name = path.split(os.path.sep)[-1].split(".")[0]
-#         dir_path = os.path.join("schedules", name)
-#         if os.path.isdir(dir_path):
-#             shutil.rmtree(dir_path)
-#         os.makedirs(dir_path, exist_ok=True)
-        
-#         try:
-#             with zipfile.ZipFile(path, 'r') as zip_ref:
-#                 zip_ref.extractall(dir_path)
-#         except:
-#             print("Name: ", name, " is corrupted")
 
 def extract_schedule(_id, operator):
     path = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
@@ -118,31 +104,6 @@ async def process_file(path, text_file, db, operator, schedule_vars, timestamp):
     collection_name = f"{timestamp}___{operator}___{var_name}"
     await insert_frame(db, collection_name, frame)
 
-# async def push_schedules():
-#     timestamp = time.time()
-#     client, db = await get_async_connection()
-#     schedule_vars = os.getenv("SCHEDULE_VARS").split(",")
-
-#     paths = glob(os.path.join("schedules", "*/"))
-#     tasks = []
-
-#     for path in paths:
-#         if "zips" in path:
-#             continue
-
-#         db_name = os.path.basename(path.strip(os.path.sep)).split("___")[0]
-#         operator = os.path.basename(path.strip(os.path.sep)).split("___")[-1]
-#         db = client[db_name]
-
-#         for text_file in os.listdir(path):
-#             tasks.append(
-#                 process_file(path, text_file, db, operator, schedule_vars, timestamp)
-#             )
-
-#     for f in tqdm_asyncio.as_completed(tasks):
-#         await f
-
-#     client.close()
 
 async def push_schedules(_id, operator):
     timestamp = time.time()
