@@ -2,6 +2,7 @@ import os
 import time
 from glob import glob
 import shutil
+import stat
 
 import aiohttp
 import zipfile
@@ -14,6 +15,19 @@ import gtfs_realtime_pb2
 from initialize_db import get_async_connection, get_sch_db_name, get_rt_db_name
 from google.protobuf.json_format import MessageToDict
 
+import logging
+
+logging.basicConfig(
+        filename='logs/app.log',  
+        level=logging.INFO,   # Minimum logging level to record (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        format='%(asctime)s - %(levelname)s - %(message)s', # Format of log messages
+        datefmt='%Y-%m-%d %H:%M:%S',  # Format for the timestamp
+        filemode='a'
+    )
+
+def make_writable(func, path, exc_info):
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 async def get_schedules():
     client, db = await get_async_connection()
@@ -56,7 +70,11 @@ async def get_schedules():
         for (_id, operator), link in schedule_urls.items():
             tasks.append(download_zip(session, _id, operator, link))
 
-        await asyncio.gather(*tasks)
+        try:
+            await asyncio.gather(*tasks)
+        except Exception as e:
+            logging.error(f"Error collecting data for {_id} error message: \n{e}\n")
+
     client.close()
     return schedule_urls
 
@@ -77,8 +95,9 @@ def extract_schedule(_id, operator):
     path = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
     name = path.split(os.path.sep)[-1].split(".")[0]
     dir_path = os.path.join("schedules", name)
+
     if os.path.isdir(dir_path):
-        shutil.rmtree(dir_path)
+        shutil.rmtree(dir_path, onexc=make_writable)
     os.makedirs(dir_path, exist_ok=True)
 
     try:
@@ -101,7 +120,7 @@ async def process_file(path, text_file, db, operator, schedule_vars, timestamp):
         pd.read_csv, os.path.join(path, text_file)
     )
 
-    collection_name = f"{timestamp}___{operator}___{var_name}"
+    collection_name = f"{int(timestamp)}___{operator}___{var_name}"
     await insert_frame(db, collection_name, frame)
 
 
@@ -165,6 +184,15 @@ async def update_schedules():
             await push_schedules(_id, operator)
             print(f"----- Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
 
+        path = os.path.join("schedules", "zips", f"{_id}___{operator}.zip")
+        name = path.split(os.path.sep)[-1].split(".")[0]
+        dir_path = os.path.join("schedules", name)
+        if len(os.listdir(dir_path)) == 0:
+            extract_schedule(_id, operator)
+            await push_schedules(_id, operator)
+            print(f"----- EMERGENCY PUSHING :: Schedules updated in {(time.time()-start)/60. :4f} minutes -----")
+
+
 def flatten_dict(data, parent_key='', sep='__'):
     items = []
     if isinstance(data, dict):
@@ -187,9 +215,6 @@ def infer_dtypes(data: dict):
                 typed_data[k] = v
             elif "_date" in k:
                 typed_data[k] = f"{v[:4]}-{v[4:6]}-{v[6:]}"
-
-            elif not v.isalnum():
-                continue
             else:
                 try:
                     typed_data[k] = int(v)
@@ -251,15 +276,19 @@ async def stream_rt_data():
                     response = fetch_rt_feed(url, headers, session)
                     responses.append(response)
                     id_var_pairs.append((_id, var_name))
-                except:
-                    continue
+                except Exception as e:
+                    logging.error(f"Error collecting data for {_id} error message: \n{e}\n")
         
-        responses = await asyncio.gather(*responses) # required session context 
+        responses = await asyncio.gather(*responses)
 
     for (_id, var_name), response in zip(id_var_pairs, responses):
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(response)
         dict_feed = MessageToDict(feed, preserving_proto_field_name=True)
+
+        # if 'miami' in _id and "trip" in var_name:
+        #     print(dict_feed)
+
         if "entity" not in dict_feed:
             continue
         entities = dict_feed["entity"]
@@ -273,6 +302,8 @@ async def stream_rt_data():
 
             n_db = client[_id]
             collection = n_db[var_name]
+            if "trip__trip_id" in n_entity:
+                n_entity["trip__trip_id"] = str(n_entity["trip__trip_id"])
             await collection.insert_one(n_entity)
 
 

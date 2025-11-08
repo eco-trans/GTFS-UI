@@ -42,6 +42,24 @@ def ini_db():
 
     client.close()
 
+def remove_ts_prec_frorm_collections():
+    client, db = get_connection()
+    transit_systems_collection = os.getenv("METADATA_COLLECTION_NAME")
+    ts_cursor = db[transit_systems_collection]
+
+    for document in ts_cursor.find({}):
+        for n_db_name in [get_sch_db_name(document)]:
+            n_db = client[n_db_name]
+            for collection_name in n_db.list_collection_names():
+                collection = n_db[collection_name]
+                if "." in collection_name:
+                    name_parts = list(collection_name.split("__"))
+                    name_parts[0] = name_parts[0].split(".")[0]
+                    print(collection_name, ">>", "__".join(name_parts))
+                    collection.rename("__".join(name_parts), dropTarget=False) 
+                    
+    client.close()
+
 def delete_added_dbs():
     client, db = get_connection()
     transit_systems_collection = os.getenv("METADATA_COLLECTION_NAME")
@@ -51,7 +69,8 @@ def delete_added_dbs():
             client.drop_database(n_db_name)
 
 if __name__ == "__main__":
-    os.makedirs("schedules/zips", exist_ok=True)
-    os.makedirs("schedules/temps", exist_ok=True)
-    delete_added_dbs()
-    ini_db()
+    # os.makedirs("schedules/zips", exist_ok=True)
+    # os.makedirs("schedules/temps", exist_ok=True)
+    # delete_added_dbs()
+    # ini_db()
+    remove_ts_prec_frorm_collections()
