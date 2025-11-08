@@ -60,6 +60,21 @@ def remove_ts_prec_frorm_collections():
                     
     client.close()
 
+def create_index_in_trip_updates():
+    client, db = get_connection()
+    transit_systems_collection = os.getenv("METADATA_COLLECTION_NAME")
+    ts_cursor = db[transit_systems_collection]
+
+    for document in ts_cursor.find({}):
+        for n_db_name in [get_rt_db_name(document)]:
+            n_db = client[n_db_name]
+            for collection_name in n_db.list_collection_names():
+                if "trip_update" in collection_name:
+                    collection = n_db[collection_name]
+                    collection.create_index([("trip__trip_id", 1)])
+                
+    client.close()
+
 def delete_added_dbs():
     client, db = get_connection()
     transit_systems_collection = os.getenv("METADATA_COLLECTION_NAME")
@@ -73,4 +88,6 @@ if __name__ == "__main__":
     # os.makedirs("schedules/temps", exist_ok=True)
     # delete_added_dbs()
     # ini_db()
-    remove_ts_prec_frorm_collections()
+    # remove_ts_prec_frorm_collections()
+    # create_index_in_trip_updates()
+    pass

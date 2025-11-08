@@ -14,7 +14,7 @@ class GTFS:
             if i["name"] == "NA":
                 continue
 
-            df = pd.DataFrame(self.sc_db[i["name"]].find({}))
+            df = pd.DataFrame(self.sc_db[i["name"]].find({})).assign(sc_upload_time=int(i["name"].split("___")[0]))
             if "trip_id" in df:
                 df = df.astype({"trip_id": "str"})
             
