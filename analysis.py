@@ -315,6 +315,56 @@ class GTFS:
 
         client.close()
 
+    
+    # def skips_for_trip(self, trip_id, trip_updates):
+    #     trip_id = str(trip_id)
+    #     x = trip_updates.loc[trip_updates.trip__trip_id == trip_id].assign(
+    #         day=lambda x: x.timestamp.astype("datetime64[s]").dt.day
+    #     )
+    #     days = x.day.unique()
+    #     days = days[~np.isnan(days)]
+    #     stops = np.unique(
+    #         x.loc[:, x.columns.str.contains("__stop_sequence")].values.flatten()
+    #     )
+    #     stops = stops[~np.isnan(stops)]
+    #     x = x.loc[
+    #         :, ~x.map(lambda x: np.nan if x == "NONE" else x).isnull().all(axis=0)
+    #     ]
+
+    #     aatp = {}
+    #     for day in days:
+    #         x_day = x.loc[x.day == day]
+    #         stop_seqs = x_day.loc[:, x_day.columns.str.contains("__stop_sequence")]
+
+    #         for i in range(stop_seqs.shape[1]):
+    #             s = stop_seqs[f"stop_time_update_{i}__stop_sequence"]
+    #             pair = s.iloc[::-1].drop_duplicates(keep="first").to_dict()
+    #             pair = {v: k for k, v in pair.items()}
+    #             for k in pair.keys():
+    #                 if (k, day) not in aatp.keys() and not np.isnan(k):
+    #                     aatp[(k, day)] = (
+    #                         pair[k],
+    #                         i,
+    #                         x.loc[pair[k], "_id"].generation_time.timestamp()
+    #                         - x.loc[
+    #                             pair[k], f"stop_time_update_{i}__arrival__time"
+    #                         ].item(),
+    #                     )
+
+    #     aatp = pd.DataFrame(aatp).T.reset_index()
+    #     aatp = aatp.rename(
+    #         columns={
+    #             k: v
+    #             for k, v in zip(
+    #                 aatp.columns, ["stop_sequence", "day", "ind", "col", "time"]
+    #             )
+    #         }
+    #     )
+    #     skip_df = aatp.groupby("stop_sequence").agg({"col": ["max", "min", "mean"]})
+    #     time_df = aatp.groupby("stop_sequence").agg({"time": ["max", "min", "mean"]})
+    #     return pd.concat([skip_df, time_df], axis=1), aatp
+
+
 
 if __name__ == "__main__":
     # cities = (
