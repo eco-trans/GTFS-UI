@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+# from tqdm import tqdm
 from initialize_db import get_connection
 
+def tqdm(obj, **kwrags):
+    return obj
 
 class GTFS:
     def __init__(self, location) -> None:
@@ -13,12 +15,14 @@ class GTFS:
         for i in self.sc_db.list_collections():
             if i["name"] == "NA":
                 continue
+            # print(i["name"])
 
-            df = pd.DataFrame(self.sc_db[i["name"]].find({})).assign(sc_upload_time=int(i["name"].split("___")[0]))
+            df = pd.DataFrame(self.sc_db[i["name"]].find({})).assign(
+                sc_upload_time=int(i["name"].split("___")[0])
+            )
             if "trip_id" in df:
                 df = df.astype({"trip_id": "str"})
-            
-                
+
             if hasattr(self, i["name"].split("___")[-1]):
                 df = pd.concat([df, getattr(self, i["name"].split("___")[-1])], axis=0)
 
@@ -28,12 +32,42 @@ class GTFS:
                 df,
             )
 
+        self.stop_times = self.stop_times.set_index(
+            ["sc_upload_time", "trip_id"], drop=True
+        ).sort_index()
+
+        self.trips = self.trips.set_index(
+            ["sc_upload_time", "trip_id"], drop=True
+        ).sort_index()
+
+        self.calendar_dates = self.calendar_dates.set_index(
+            ["sc_upload_time", "service_id"], drop=True
+        ).sort_index()
+
+        dates = (
+            self.calendar_dates.loc[:, "date"]
+            .map(str)
+            .map(lambda x: pd.to_datetime(f"{x[0:4]}-{x[4:6]}-{x[6:8]}"))
+        )
+        self.calendar_dates.drop("date", axis=1, inplace=True)
+        self.calendar_dates["date"] = dates
+
+        self.calendar = self.calendar.set_index(
+            ["sc_upload_time", "service_id"], drop=True
+        ).sort_index()
+
+        dates = (
+            self.calendar.loc[:, "end_date"]
+            .map(str)
+            .map(lambda x: pd.to_datetime(f"{x[0:4]}-{x[4:6]}-{x[6:8]}"))
+        )
+        self.calendar.drop("end_date", axis=1, inplace=True)
+        self.calendar["end_date"] = dates
+
         client.close()
 
-    def actual_arrivals_for_trip(self, trip_id, trip_updates):
-        x = trip_updates.loc[trip_updates.trip__trip_id == trip_id].assign(
-            day=lambda x: x.timestamp.astype("datetime64[s]").dt.day
-        )
+    def actual_arrivals_for_trip(self, trip_updates):
+        x = trip_updates
 
         if "trip__schedule_relationship" in x.columns:
             mask = x.trip__schedule_relationship == "CANCELED"
@@ -41,8 +75,7 @@ class GTFS:
             if x.shape[0] == 0:
                 return None
 
-        days = x.day.unique()
-        days = days[~np.isnan(days)]
+        dates = x.date.unique()
         stops = np.unique(
             x.loc[:, x.columns.str.contains("__stop_sequence")].values.flatten()
         )
@@ -52,8 +85,8 @@ class GTFS:
         ]
 
         aatp = {}
-        for day in days:
-            x_day = x.loc[x.day ==  day]
+        for date in dates:
+            x_day = x.loc[x.date == date]
             stop_seqs = x_day.loc[:, x_day.columns.str.contains("__stop_sequence")]
 
             for i in range(stop_seqs.shape[1]):
@@ -69,14 +102,16 @@ class GTFS:
                         == "SKIPPED"
                     ):
                         continue
-                    if (k, day) not in aatp.keys() and not np.isnan(k):
-                        aatp[(k, day)] = (pair[k], i)
+                    if (k, date) not in aatp.keys() and not np.isnan(k):
+                        aatp[(k, date)] = (pair[k], i, x.loc[pair[k], "time"].item())
 
         aatp = pd.DataFrame(aatp).T.reset_index()
         aatp = aatp.rename(
             columns={
                 k: v
-                for k, v in zip(aatp.columns, ["stop_sequence", "day", "ind", "col"])
+                for k, v in zip(
+                    aatp.columns, ["stop_sequence", "date", "ind", "col", "time"]
+                )
             }
         )
 
@@ -86,7 +121,7 @@ class GTFS:
                 aat.append(
                     {
                         "stop_sequence": row.stop_sequence,
-                        "day": row.day,
+                        "time": row.time,
                         "actual_arrival_time": x.loc[
                             row.ind, f"stop_time_update_{row.col}__arrival__time"
                         ].item(),
@@ -96,7 +131,7 @@ class GTFS:
                 aat.append(
                     {
                         "stop_sequence": row.stop_sequence,
-                        "day": row.day,
+                        "time": row.time,
                         "actual_arrival_time": x.loc[
                             row.ind, f"stop_time_update_{row.col}__departure__time"
                         ].item(),
@@ -120,12 +155,14 @@ class GTFS:
 
         return aat
 
-    def calulate_delay(self, trip_id, trip_updates):
-        estimated_arrivals = self.stop_times.loc[
-            self.stop_times.trip_id == trip_id, ["stop_sequence", "arrival_time"]
-        ].rename(columns={"arrival_time": "scheduled_arrival_time"})
+    def calulate_delay(self, trip_id, trip_updates, sc_time):
+        estimated_arrivals = (
+            self.stop_times.loc[(sc_time, trip_id), ["stop_sequence", "arrival_time"]]
+            .rename(columns={"arrival_time": "scheduled_arrival_time"})
+            .reset_index(drop=True)
+        )
 
-        actual_arrivals = self.actual_arrivals_for_trip(trip_id, trip_updates)
+        actual_arrivals = self.actual_arrivals_for_trip(trip_updates)
 
         if actual_arrivals is None:
             return None
@@ -133,7 +170,9 @@ class GTFS:
         try:
             actual_arrivals = actual_arrivals.assign(
                 actual_arrival_time=lambda x: x.actual_arrival_time.dt.tz_convert(
-                    self.agency.agency_timezone.unique().item()
+                    self.agency.loc[self.agency.sc_upload_time == sc_time]
+                    .agency_timezone.unique()
+                    .item()
                 )
             )
         except:
@@ -151,57 +190,14 @@ class GTFS:
         ).assign(
             scheduled_arrival_time=lambda x: x.scheduled_arrival_time.map(pd.Timedelta)
         )
+
+        days_to_remove = merged_arrivals.scheduled_arrival_time.dt.days
+        days_only_td = days_to_remove.map(lambda x: pd.Timedelta(days=x))
+        merged_arrivals.loc[:, "scheduled_arrival_time"] -= days_only_td
+
         return merged_arrivals
-
-    def skips_for_trip(self, trip_id, trip_updates):
-        trip_id = str(trip_id)
-        x = trip_updates.loc[trip_updates.trip__trip_id == trip_id].assign(
-            day=lambda x: x.timestamp.astype("datetime64[s]").dt.day
-        )
-        days = x.day.unique()
-        days = days[~np.isnan(days)]
-        stops = np.unique(
-            x.loc[:, x.columns.str.contains("__stop_sequence")].values.flatten()
-        )
-        stops = stops[~np.isnan(stops)]
-        x = x.loc[
-            :, ~x.map(lambda x: np.nan if x == "NONE" else x).isnull().all(axis=0)
-        ]
-
-        aatp = {}
-        for day in days:
-            x_day = x.loc[x.day == day]
-            stop_seqs = x_day.loc[:, x_day.columns.str.contains("__stop_sequence")]
-
-            for i in range(stop_seqs.shape[1]):
-                s = stop_seqs[f"stop_time_update_{i}__stop_sequence"]
-                pair = s.iloc[::-1].drop_duplicates(keep="first").to_dict()
-                pair = {v: k for k, v in pair.items()}
-                for k in pair.keys():
-                    if (k, day) not in aatp.keys() and not np.isnan(k):
-                        aatp[(k, day)] = (
-                            pair[k],
-                            i,
-                            x.loc[pair[k], "_id"].generation_time.timestamp()
-                            - x.loc[
-                                pair[k], f"stop_time_update_{i}__arrival__time"
-                            ].item(),
-                        )
-
-        aatp = pd.DataFrame(aatp).T.reset_index()
-        aatp = aatp.rename(
-            columns={
-                k: v
-                for k, v in zip(
-                    aatp.columns, ["stop_sequence", "day", "ind", "col", "time"]
-                )
-            }
-        )
-        skip_df = aatp.groupby("stop_sequence").agg({"col": ["max", "min", "mean"]})
-        time_df = aatp.groupby("stop_sequence").agg({"time": ["max", "min", "mean"]})
-        return pd.concat([skip_df, time_df], axis=1), aatp
-
-    def run_delay_analyzer(self, chunk_size=1000):
+    
+    def run_delay_analyzer(self):
         client, _ = get_connection()
         rt_db = client[f"{self.location}__realtime"]
         try:
@@ -219,66 +215,121 @@ class GTFS:
             else "id__muk"
         )
 
-        scheduled_trip_ids = self.stop_times.trip_id.unique()
+        completed_trips = dict()
 
-        for i in tqdm(
-            range(0, scheduled_trip_ids.shape[0], chunk_size),
-            desc="Checking if trip id in RTD",
+        for sc_time in tqdm(
+            sorted(self.stop_times.index.get_level_values(0).unique()),
+            desc="Searching historic schedules",
         ):
-            ids = scheduled_trip_ids[i : i + chunk_size].tolist()
-            ids = list(map(str, ids))
+            stop_times = self.stop_times.loc[sc_time]
 
-            trip_updates = pd.DataFrame(
-                rt_db["trip_updates"].find({field_name: {"$in": ids}})
-            ).rename(columns={field_name: "trip__trip_id"})
+            scheduled_trip_ids = stop_times.index.unique()
 
-            if trip_updates.shape[0] > 0:
-                for tid in tqdm(
-                    trip_updates.trip__trip_id.unique(),
-                    desc=f"Analyzing scheduled trip ids in RTD",
-                    leave=False,
-                ):
-                    merged_arrivals = self.calulate_delay(tid, trip_updates)
-                    if merged_arrivals is None:
+            for trip_id in tqdm(
+                scheduled_trip_ids, desc="Checking if trip id in RTD", leave=False
+            ):
+                
+                str_trip_id = str(trip_id)
+
+                trip_updates = pd.DataFrame(
+                    rt_db["trip_updates"].find({field_name: str_trip_id})
+                ).rename(columns={field_name: "trip__trip_id"})
+
+                if trip_updates.shape[0] > 0:
+                    try:
+                        service_id = self.trips.loc[
+                            (sc_time, trip_id), "service_id"
+                        ].item()
+                    except:
+                        service_id = self.trips.loc[(sc_time, trip_id), "service_id"]
+
+                    if completed_trips.get((trip_id, service_id)) is not None:
+                        # print("B")
                         continue
 
-                    result = (
-                        merged_arrivals.assign(
-                            delay=lambda x: x.actual_arrival_time
-                            - x.scheduled_arrival_time
+                    if service_id not in self.calendar.index.get_level_values(
+                        1
+                    ) and service_id not in self.calendar_dates.index.get_level_values(
+                        1
+                    ):
+                        # print("C: ", service_id)
+                        continue
+
+                    trip_updates = trip_updates.assign(
+                        time=lambda x: x._id.map(
+                            lambda y: y.generation_time.timestamp()
+                        ).astype("int")
+                    ).assign(
+                        date=lambda x: x.time.astype("datetime64[s]").dt.strftime(
+                            "%Y-%m-%d"
                         )
-                        .drop("day", axis=1)
-                        .groupby("stop_sequence", observed=False)["delay"]
-                        .agg("mean,std,max,min,count".split(","))
-                        .map(lambda x: x if type(x) == int else x.total_seconds())
-                        .fillna(0.0)
-                        .T.to_dict()
                     )
 
-                    collection.insert_one(
-                        {
-                            "trip_id": str(tid),
-                            **{str(k): v for k, v in result.items()},
-                        }
-                    )
+                    try:
+                        max_date = self.calendar.loc[(sc_time, service_id), "end_date"]
+                    except:
+                        max_date = self.calendar_dates.loc[(sc_time, service_id), "date"].max()
 
-            i += chunk_size
- 
+                    try:
+                        max_date = max_date.item()
+                    except:
+                        pass
+
+                    mask = (max_date - pd.to_datetime(trip_updates.loc[:, "date"])).map(
+                        lambda x: x.total_seconds()
+                    ) >= 0
+                    trip_updates = trip_updates.loc[mask]
+
+                    if trip_updates.shape[0] > 0:
+                        try:
+                            merged_arrivals = self.calulate_delay(
+                                str_trip_id, trip_updates, sc_time
+                            )
+                        except:
+                            # print("F: ", trip_id)
+                            continue
+
+                        if merged_arrivals is None:
+                            # print("E")
+                            continue
+                        else:
+                            completed_trips[(trip_id, service_id)] = True
+                            data = merged_arrivals.assign(
+                                delay__sc_minus_ac=lambda x: (
+                                    x.scheduled_arrival_time - x.actual_arrival_time
+                                ).dt.total_seconds()
+                            )[
+                                "stop_sequence,time,delay__sc_minus_ac".split(",")
+                            ].values.tolist()
+                            collection.insert_one(
+                                {
+                                    "trip_id": str_trip_id,
+                                    "sc_time": sc_time,
+                                    "data": data,
+                                }
+                            )
+                    # else:
+                    #     print("D: ", str_trip_id)
+                # else:
+                #     print("A: ", str_trip_id)
+
         client.close()
 
 
 if __name__ == "__main__":
+    # cities = (
+    #     "San Francisco,New York City,Atlanta,Miami,Salt Lake City".lower()
+    #     .replace(" ", "_")
+    #     .split(",")
+    # )
+
     cities = (
-        "San Francisco,New York City,Atlanta,Miami,Salt Lake City".lower()
+        "Atlanta,Salt Lake City,San Francisco,New York City".lower()
         .replace(" ", "_")
         .split(",")
     )
 
-    cities = (
-        "San Francisco,Atlanta,New York City,Salt Lake City".lower()
-        .replace(" ", "_")
-        .split(",")
-    )
+    # cities = "Salt Lake City".lower().replace(" ", "_").split(",")
 
     for city in cities:
         print(f"starting for {city}")
