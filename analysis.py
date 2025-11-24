@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
+
 # from tqdm import tqdm
 from initialize_db import get_connection
 
+
 def tqdm(obj, **kwrags):
     return obj
+
 
 class GTFS:
     def __init__(self, location) -> None:
@@ -64,6 +67,15 @@ class GTFS:
         self.calendar.drop("end_date", axis=1, inplace=True)
         self.calendar["end_date"] = dates
 
+        dates = (
+            self.calendar.loc[:, "start_date"]
+            .map(str)
+            .map(lambda x: pd.to_datetime(f"{x[0:4]}-{x[4:6]}-{x[6:8]}"))
+        )
+
+        self.calendar.drop("start_date", axis=1, inplace=True)
+        self.calendar["start_date"] = dates
+
         client.close()
 
     def actual_arrivals_for_trip(self, trip_updates):
@@ -95,15 +107,15 @@ class GTFS:
                 pair = {v: k for k, v in pair.items()}
                 for k in pair.keys():
                     if (
-                        f"stop_time_update_{i}__schedule_relationship" in x.columns
-                        and x.loc[
+                        f"stop_time_update_{i}__schedule_relationship" in x_day.columns
+                        and x_day.loc[
                             pair[k], f"stop_time_update_{i}__schedule_relationship"
                         ]
                         == "SKIPPED"
                     ):
                         continue
                     if (k, date) not in aatp.keys() and not np.isnan(k):
-                        aatp[(k, date)] = (pair[k], i, x.loc[pair[k], "time"].item())
+                        aatp[(k, date)] = (pair[k], i, x_day.loc[pair[k], "time"].item())
 
         aatp = pd.DataFrame(aatp).T.reset_index()
         aatp = aatp.rename(
@@ -122,6 +134,7 @@ class GTFS:
                     {
                         "stop_sequence": row.stop_sequence,
                         "time": row.time,
+                        "date": row.date,
                         "actual_arrival_time": x.loc[
                             row.ind, f"stop_time_update_{row.col}__arrival__time"
                         ].item(),
@@ -132,6 +145,7 @@ class GTFS:
                     {
                         "stop_sequence": row.stop_sequence,
                         "time": row.time,
+                        "date": row.date,
                         "actual_arrival_time": x.loc[
                             row.ind, f"stop_time_update_{row.col}__departure__time"
                         ].item(),
@@ -142,6 +156,8 @@ class GTFS:
 
         if aat.shape[0] == 0:
             return None
+
+        aat["actual_arrival_time_unix"] = aat["actual_arrival_time"]
 
         aat = (
             aat.sort_values("stop_sequence", ignore_index=True)
@@ -183,6 +199,7 @@ class GTFS:
             .dropna()
             .reset_index(drop=True)
         )
+
         merged_arrivals = merged_arrivals.assign(
             actual_arrival_time=lambda x: x.actual_arrival_time.dt.time.astype(
                 "str"
@@ -196,24 +213,44 @@ class GTFS:
         merged_arrivals.loc[:, "scheduled_arrival_time"] -= days_only_td
 
         return merged_arrivals
+
     
+    def clear_all_collections(self, client, db_name):
+        db = client[db_name]
+        collection_names = db.list_collection_names()
+        total_deleted_count = 0
+        
+        for collection_name in collection_names:
+            collection = db[collection_name]
+            result = collection.delete_many({})
+            total_deleted_count += result.deleted_count
+            collection.drop()
+
+        return total_deleted_count
+
     def run_delay_analyzer(self):
         client, _ = get_connection()
+
+        total_deleted_count = self.clear_all_collections(client, f"{self.location}__delay")
+        print("Deleted previous records: ", total_deleted_count)
+
         rt_db = client[f"{self.location}__realtime"]
-        try:
-            rt_db["delay"].drop()
-        except:
-            pass
+        rt_delay_db = client[f"{self.location}__delay"]
 
-        collection = rt_db["delay"]
+        # try:
+        #     rt_db["delay"].drop()
+        # except:
+        #     pass
 
-        field_name = (
-            "trip__trip_id"
-            if pd.DataFrame(rt_db["trip_updates"].find().limit(100))
-            .columns.str.contains("trip__trip_id")
-            .any()
-            else "id__muk"
-        )
+        # field_name = (
+        #     "trip__trip_id"
+        #     if pd.DataFrame(rt_db["trip_updates"].find().limit(100))
+        #     .columns.str.contains("trip__trip_id")
+        #     .any()
+        #     else "id__muk"
+        # )
+
+        field_name = "trip__trip_id"
 
         completed_trips = dict()
 
@@ -228,7 +265,7 @@ class GTFS:
             for trip_id in tqdm(
                 scheduled_trip_ids, desc="Checking if trip id in RTD", leave=False
             ):
-                
+
                 str_trip_id = str(trip_id)
 
                 trip_updates = pd.DataFrame(
@@ -266,25 +303,49 @@ class GTFS:
                     )
 
                     try:
+                        min_date = self.calendar.loc[
+                            (sc_time, service_id), "start_date"
+                        ]
+                    except:
+                        min_date = self.calendar_dates.loc[
+                            (sc_time, service_id), "date"
+                        ].min()
+
+                    try:
+                        min_date = min_date.item()
+                    except:
+                        pass
+
+                    try:
                         max_date = self.calendar.loc[(sc_time, service_id), "end_date"]
                     except:
-                        max_date = self.calendar_dates.loc[(sc_time, service_id), "date"].max()
+                        max_date = self.calendar_dates.loc[
+                            (sc_time, service_id), "date"
+                        ].max()
 
                     try:
                         max_date = max_date.item()
                     except:
                         pass
 
-                    mask = (max_date - pd.to_datetime(trip_updates.loc[:, "date"])).map(
-                        lambda x: x.total_seconds()
-                    ) >= 0
-                    trip_updates = trip_updates.loc[mask]
+                    min_mask = (
+                        min_date - pd.to_datetime(trip_updates.loc[:, "date"])
+                    ).map(lambda x: x.total_seconds()) <= 0
 
+                    max_mask = (
+                        max_date - pd.to_datetime(trip_updates.loc[:, "date"])
+                    ).map(lambda x: x.total_seconds()) >= 0
+
+                    mask = min_mask & max_mask
+
+                    trip_updates = trip_updates.loc[mask]
+                
                     if trip_updates.shape[0] > 0:
                         try:
                             merged_arrivals = self.calulate_delay(
                                 str_trip_id, trip_updates, sc_time
                             )
+                            
                         except:
                             # print("F: ", trip_id)
                             continue
@@ -298,16 +359,25 @@ class GTFS:
                                 delay__sc_minus_ac=lambda x: (
                                     x.scheduled_arrival_time - x.actual_arrival_time
                                 ).dt.total_seconds()
-                            )[
-                                "stop_sequence,time,delay__sc_minus_ac".split(",")
-                            ].values.tolist()
-                            collection.insert_one(
-                                {
-                                    "trip_id": str_trip_id,
-                                    "sc_time": sc_time,
-                                    "data": data,
-                                }
                             )
+
+                            for date_frame in data.groupby("date"):
+                                
+                                frame = date_frame[1]
+                                if frame["date"].unique().shape[0] > 1:
+                                    raise Exception("More than one date in a group")
+                                collection = rt_delay_db[date_frame[0]]
+                                collection.insert_one(
+                                    {
+                                        "trip_id": str_trip_id,
+                                        "sc_time": sc_time,
+                                        "data": frame[
+                                            "stop_sequence,time,actual_arrival_time_unix,delay__sc_minus_ac".split(
+                                                ","
+                                            )
+                                        ].values.tolist(),
+                                    }
+                                )
                     # else:
                     #     print("D: ", str_trip_id)
                 # else:
@@ -315,7 +385,6 @@ class GTFS:
 
         client.close()
 
-    
     # def skips_for_trip(self, trip_id, trip_updates):
     #     trip_id = str(trip_id)
     #     x = trip_updates.loc[trip_updates.trip__trip_id == trip_id].assign(
@@ -363,7 +432,6 @@ class GTFS:
     #     skip_df = aatp.groupby("stop_sequence").agg({"col": ["max", "min", "mean"]})
     #     time_df = aatp.groupby("stop_sequence").agg({"time": ["max", "min", "mean"]})
     #     return pd.concat([skip_df, time_df], axis=1), aatp
-
 
 
 if __name__ == "__main__":
