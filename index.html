@@ -3,34 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GTFS Delay Dashboard</title>
+    <title>GTFS Delay Dashboard – San Francisco</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
     <style>
-        /* General Reset and Base Styles */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         body {
             background-color: #f5f7fa;
             height: 100vh;
             overflow: hidden;
         }
-        
+
         .dashboard-container {
             display: flex;
             height: 100vh;
             padding: 15px;
             gap: 15px;
         }
-        
-        /* Map Container (Left - A) */
+
         .map-container {
             flex: 2;
             border-radius: 10px;
@@ -44,16 +41,15 @@
             width: 100%;
         }
 
-        /* Dashboard Content (Right - B) - CSS FIX 1: Set min-height to 0 and flex-direction to column */
         .data-container {
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-height: 0; /* Important for flex-grow within 100vh container */
+            min-height: 0;
             border-radius: 10px;
             background-color: #ffffff;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            overflow: hidden; /* Contains children */
+            overflow: hidden;
         }
 
         .controls {
@@ -62,42 +58,52 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            flex-shrink: 0; /* Don't shrink the controls */
+            flex-shrink: 0;
         }
 
-        .controls label {
-            font-weight: bold;
-            font-size: 0.9em;
-            color: #333;
+        .controls h1 {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #2c3e50;
         }
 
-        .controls select, .controls input[type="text"] {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 100%;
+        .controls p {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            line-height: 1.3;
         }
 
         .controls button {
-            padding: 10px;
+            padding: 8px 10px;
             background-color: #3498db;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             transition: background-color 0.2s;
+            font-size: 0.9em;
+            align-self: flex-start;
         }
 
         .controls button:hover {
             background-color: #2980b9;
         }
-        
+
+        .controls .status-line {
+            font-size: 0.85em;
+            color: #34495e;
+        }
+
+        .status-label {
+            font-weight: 600;
+        }
+
         .tabs {
             display: flex;
             border-bottom: 1px solid #e0e0e0;
-            flex-shrink: 0; /* Don't shrink the tabs */
+            flex-shrink: 0;
         }
-        
+
         .tab-button {
             padding: 15px 20px;
             cursor: pointer;
@@ -105,43 +111,41 @@
             color: #7f8c8d;
             transition: color 0.2s, border-bottom 0.2s;
         }
-        
+
         .tab-button.active {
             color: #3498db;
             border-bottom: 3px solid #3498db;
         }
-        
-        /* CSS FIX 2: Set overflow-y: auto for the tab content */
+
         .tab-content {
             padding: 15px;
             display: none;
-            overflow-y: auto; /* Enables vertical scrolling */
-            flex-grow: 1; /* Takes up remaining vertical space */
-            min-height: 0; /* Crucial for flex scrolling containers */
+            overflow-y: auto;
+            flex-grow: 1;
+            min-height: 0;
         }
-        
+
         .tab-content.active {
-            display: flex; /* Use flex to allow chart-area to grow */
+            display: flex;
             flex-direction: column;
         }
-        
+
         .chart-container {
             margin-bottom: 20px;
             padding: 10px;
             background-color: #fcfcfc;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            /* CSS FIX 3: Set a fixed height for the chart container to prevent infinite growth */
-            height: 350px; 
-            max-height: 50vh; /* Optional: adds a relative limit */
+            height: 350px;
+            max-height: 50vh;
         }
 
         .chart-container h2 {
-            font-size: 1.1em;
+            font-size: 1.0em;
             color: #333;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
+            padding-bottom: 4px;
         }
 
         .map-overlay {
@@ -155,9 +159,25 @@
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            font-size: 1.2em;
+            font-size: 1.0em;
             font-weight: bold;
             color: #2c3e50;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .nearest-stops-label {
+            font-size: 0.8em;
+            color: #7f8c8d;
+        }
+
+        .nearest-stops-input {
+            width: 60px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 0.85em;
+            margin-left: 4px;
         }
     </style>
 </head>
@@ -166,27 +186,32 @@
         <div class="map-container">
             <div id="map"></div>
             <div id="map-overlay" class="map-overlay">
-                Please select a City and enter a Trip ID to load data.
+                Loading metadata for San Francisco…<br>
+                Once loaded, click anywhere on the map to explore nearby routes.
             </div>
         </div>
-        
+
         <div class="data-container">
             <div class="controls">
-                <label for="city-select">Select City:</label>
-                <select id="city-select">
-                    <option value="Atlanta">Atlanta</option>
-                    <option value="New York City">New York City</option>
-                    <option value="Salt Lake City">Salt Lake City</option>
-                    <option value="San Francisco">San Francisco</option>
-                </select>
+                <h1>San Francisco GTFS Delay Explorer</h1>
+                <p>
+                    1) Click anywhere on the map to find nearby stops and routes.<br>
+                    2) Click a route to focus it.<br>
+                    3) Click a stop on that route to see delay patterns (both directions).
+                </p>
 
-                <label for="trip-id-input">Enter Trip ID:</label>
-                <input type="text" id="trip-id-input" placeholder="e.g., 12345678">
+                <div class="nearest-stops-label">
+                    Nearest stops to use from click:
+                    <input id="nearest-count" type="number" min="1" max="15" value="5" class="nearest-stops-input">
+                </div>
 
-                <button onclick="fetchAndRenderData()">Load Trip Data</button> 
+                <button id="clear-route-btn">Clear Route Selection</button>
 
-                <div id="selected-stop-info" style="margin-top: 10px; font-weight: bold; color: #2980b9;">
-                    Selected Stop: None
+                <div class="status-line" id="selected-route-info">
+                    <span class="status-label">Selected route:</span> None
+                </div>
+                <div class="status-line" id="selected-stop-info">
+                    <span class="status-label">Selected stop:</span> None
                 </div>
             </div>
 
@@ -197,22 +222,19 @@
             </div>
 
             <div id="delays" class="tab-content active">
-                <p id="chart-message" style="flex-shrink: 0;">Click a station (point) on the map to see its delay analysis.</p>
-                
-                <div id="chart-area" style="display: none;">
+                <p id="chart-message" style="flex-shrink:0; font-size:0.9em; color:#7f8c8d;">
+                    Select a route and then a stop to see hourly and daily delay patterns (direction 0 & 1).
+                </p>
+
+                <div id="chart-area" style="display:none;">
                     <div class="chart-container">
-                        <h2>Daily Delay Time Series (Selected Stop)</h2>
+                        <h2>Hourly Delay (Direction 0 &amp; 1)</h2>
+                        <canvas id="hourlyDelayChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h2>Daily Delay (Direction 0 &amp; 1)</h2>
                         <canvas id="dailyDelayChart"></canvas>
-                    </div>
-
-                    <div class="chart-container">
-                        <h2>Stop-by-Stop Average Delay (Full Trip)</h2>
-                        <canvas id="stopAvgDelayChart"></canvas>
-                    </div>
-
-                    <div class="chart-container">
-                        <h2>Delay Distribution (Selected Stop)</h2>
-                        <canvas id="delayDistributionChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -220,6 +242,7 @@
             <div id="accessibility" class="tab-content">
                 <p>Accessibility information will be displayed here.</p>
             </div>
+
             <div id="reliability" class="tab-content">
                 <p>Reliability metrics will be displayed here.</p>
             </div>
@@ -227,312 +250,550 @@
     </div>
 
     <script>
-        // --- Initialization ---
+        // ---- Constants / Endpoints ----
+        const SF_CENTER = [37.758458, -122.435435];
+
+        const BASE_META_URL = "https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/meta/san_francisco";
+        const STOP_LOCATION_URL = `${BASE_META_URL}/stop_location.json`;
+        const STOP_ROUTE_MAPPING_BASE = `${BASE_META_URL}/stop_route_mapping`;
+        const ROUTE_STOP_MAPPING_BASE = `${BASE_META_URL}/route_stop_mapping`;
+        const ROUTES_METADATA_URL = `${BASE_META_URL}/routes_metadata.json`;
+        const STOPS_METADATA_URL = `${BASE_META_URL}/stops_metadata.json`;
+        const ROUTE_DIR_STOP_DELAY_BASE = `${BASE_META_URL}/route_direction_stop_delay`;
+
+        // ---- State ----
         let map;
-        let markers = new L.FeatureGroup();
-        let currentTripData = {}; 
-        let processedStopData = {}; 
-        let dailyDelayChart, stopAvgDelayChart, delayDistributionChart;
+        let metaLoaded = false;
 
-        // Leaflet map setup (Canvas A)
-        map = L.map('map').setView([39.8283, -98.5795], 4); // Center of US
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        let stopLocations = null;      // {stop_id: [lat, lon]}
+        let routesMetadata = null;     // {route_id: {name, color, link}}
+        let stopsMetadata = null;      // {stop_id: {name, link}}
 
-        // --- Utility Functions ---
+        let stopRouteMappingCache = {}; // stop_id -> [route_id, ...]
+        let routeStopMappingCache = {}; // route_id -> [[stop_id, ...], ...]
+        let delayDataCache = {};        // key "routeId_dir_stopId" -> [{t, delay}, ...]
 
+        let routesLayerGroup;
+        let stopsLayerGroup;
+        let selectedRouteId = null;
+
+        // stop_id -> { marker: L.circleMarker, routes: Set(route_ids) }
+        let stopMarkerIndex = {};
+
+        // route_id -> [L.Polyline,...]
+        let routeLayerIndex = {};
+
+        // Charts
+        let hourlyDelayChart = null;
+        let dailyDelayChart = null;
+
+        // ---- Utility: Tabs ----
         function openTab(evt, tabName) {
-            // Get all elements with class="tab-content" and hide them
-            let tabcontent = document.getElementsByClassName("tab-content");
+            const tabcontent = document.getElementsByClassName("tab-content");
             for (let i = 0; i < tabcontent.length; i++) {
                 tabcontent[i].style.display = "none";
+                tabcontent[i].classList.remove("active");
             }
 
-            // Get all elements with class="tab-button" and remove the class "active"
-            let tabbuttons = document.getElementsByClassName("tab-button");
-            // FIXED: The loop condition was wrong (i = 0 < tabbuttons.length)
-            for (let i = 0; i < tabbuttons.length; i++) { 
+            const tabbuttons = document.getElementsByClassName("tab-button");
+            for (let i = 0; i < tabbuttons.length; i++) {
                 tabbuttons[i].className = tabbuttons[i].className.replace(" active", "");
             }
 
-            // Show the current tab, and add an "active" class to the button that opened the tab
             const targetTab = document.getElementById(tabName);
             if (targetTab) {
                 targetTab.style.display = "flex";
+                targetTab.classList.add("active");
             }
             if (evt && evt.currentTarget) {
                 evt.currentTarget.className += " active";
             }
         }
 
-        function cityToURL(cityName) {
-            return cityName.toLowerCase().replace(/ /g, '_');
+        // ---- Utility helpers ----
+        function getNearestCount() {
+            const input = document.getElementById("nearest-count");
+            let k = parseInt(input.value, 10);
+            if (isNaN(k) || k <= 0) k = 5;
+            return Math.min(Math.max(k, 1), 50);
         }
 
-        // --- Data Fetching and Processing ---
+        function euclideanDistance(lat1, lon1, lat2, lon2) {
+            const dLat = lat1 - lat2;
+            const dLon = lon1 - lon2;
+            return Math.sqrt(dLat * dLat + dLon * dLon);
+        }
 
-        async function fetchAndRenderData() {
-            const citySelect = document.getElementById('city-select');
-            const tripIdInput = document.getElementById('trip-id-input');
-            const city = citySelect.value;
-            const tripId = tripIdInput.value;
+        function computeMeanStd(values) {
+            if (!values || values.length === 0) return { mean: null, std: null };
+            const n = values.length;
+            const sum = values.reduce((a, b) => a + b, 0);
+            const mean = sum / n;
+            const varSum = values.reduce((acc, v) => {
+                const diff = v - mean;
+                return acc + diff * diff;
+            }, 0);
+            const std = Math.sqrt(varSum / n);
+            return { mean, std };
+        }
 
-            if (!city || !tripId) {
-                alert('Please select a City and enter a Trip ID.');
-                return;
-            }
+        function groupByHour(samples) {
+            // samples: [{t, delay}]
+            const buckets = Array.from({ length: 24 }, () => []);
+            samples.forEach(s => {
+                const d = new Date(s.t * 1000);
+                const hour = d.getHours(); // local hours
+                buckets[hour].push(s.delay);
+            });
+            return buckets;
+        }
 
-            // 1. Construct the URL
-            const cityURL = cityToURL(city);
-            const dataURL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/delay/${cityURL}/${tripId}.json`;
-            
-            document.getElementById('map-overlay').innerText = `Fetching data for ${city} (Trip ID: ${tripId})...`;
-            document.getElementById('map-overlay').style.display = 'flex';
-            
+        function groupByDate(samples) {
+            const groups = {};
+            samples.forEach(s => {
+                const d = new Date(s.t * 1000);
+                const dateStr = d.toISOString().split("T")[0];
+                if (!groups[dateStr]) groups[dateStr] = [];
+                groups[dateStr].push(s.delay);
+            });
+            return groups;
+        }
+
+        // ---- Metadata loading ----
+        async function loadMetadata() {
+            const overlay = document.getElementById("map-overlay");
             try {
-                // 2. Fetch the data
-                const response = await fetch(dataURL);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                currentTripData = await response.json();
+                const [stopLocRes, routesMetaRes, stopsMetaRes] = await Promise.all([
+                    fetch(STOP_LOCATION_URL),
+                    fetch(ROUTES_METADATA_URL),
+                    fetch(STOPS_METADATA_URL)
+                ]);
 
-                // 3. Process the data
-                processStopData(currentTripData.data);
-                
-                // 4. Update the map (Canvas A)
-                updateMap();
+                if (!stopLocRes.ok) throw new Error("stop_location.json failed");
+                if (!routesMetaRes.ok) throw new Error("routes_metadata.json failed");
+                if (!stopsMetaRes.ok) throw new Error("stops_metadata.json failed");
 
-                // 5. Clear right panel initial state
-                document.getElementById('selected-stop-info').innerText = 'Selected Stop: None';
-                document.getElementById('chart-message').style.display = 'block';
-                document.getElementById('chart-area').style.display = 'none';
-                
-            } catch (error) {
-                console.error('Error fetching or processing data:', error);
-                document.getElementById('map-overlay').innerText = `Error loading data. Check City/Trip ID. (${error.message})`;
+                stopLocations = await stopLocRes.json();
+                routesMetadata = await routesMetaRes.json();
+                stopsMetadata = await stopsMetaRes.json();
+
+                metaLoaded = true;
+                overlay.textContent = "Metadata loaded. Click on the map to explore nearby routes.";
+                setTimeout(() => {
+                    overlay.style.display = "none";
+                }, 1000);
+            } catch (err) {
+                console.error(err);
+                overlay.textContent = "Error loading metadata. Please refresh the page.";
             }
         }
 
-        function processStopData(data) {
-            processedStopData = {};
-            
-            // data format: [stop sequence, stop id, lat, lng, timestamp for data collection, delay in sec]
-            data.forEach(item => {
-                const [stop_seq, stop_id, lat, lng, timestamp, delay_sec] = item;
-                // Use ISO string for a stable date format (YYYY-MM-DD)
-                const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+        // ---- Map setup ----
+        function initMap() {
+            map = L.map('map').setView(SF_CENTER, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
 
-                if (!processedStopData[stop_id]) {
-                    processedStopData[stop_id] = {
-                        stop_id: stop_id,
-                        stop_seq: parseInt(stop_seq),
-                        lat: lat,
-                        lng: lng,
-                        measurements: []
-                    };
-                }
-                
-                // Store measurement with date
-                processedStopData[stop_id].measurements.push({
-                    timestamp: timestamp,
-                    date: date,
-                    delay_min: delay_sec
-                });
-            });
+            routesLayerGroup = L.layerGroup().addTo(map);
+            stopsLayerGroup = L.layerGroup().addTo(map);
+
+            map.on('click', onMapClick);
         }
-        
-        function updateMap() {
-            // Clear existing markers
-            markers.clearLayers();
-            map.removeLayer(markers);
-            
-            const stopIds = Object.keys(processedStopData);
-            if (stopIds.length === 0) {
-                document.getElementById('map-overlay').innerText = 'No stop data found for this trip.';
+
+        // ---- Map click: find nearest stops & draw routes ----
+        async function onMapClick(e) {
+            if (!metaLoaded) {
+                alert("Metadata not loaded yet. Please wait a moment and try again.");
                 return;
             }
 
-            let bounds = [];
+            const overlay = document.getElementById("map-overlay");
+            overlay.style.display = "flex";
+            overlay.textContent = "Finding nearest stops and routes…";
 
-            // Add new markers (Canvas A - Points)
-            stopIds.forEach(stopId => {
-                const stop = processedStopData[stopId];
-                const latLng = [stop.lat, stop.lng];
-                bounds.push(latLng);
+            const { lat, lng } = e.latlng;
+            const k = getNearestCount();
 
-                const marker = L.circleMarker(latLng, {
-                    radius: 8,
-                    color: '#3498db',
-                    fillColor: '#3498db',
-                    fillOpacity: 0.8
-                })
-                .bindPopup(`Stop Sequence: ${stop.stop_seq}<br>Stop ID: ${stop.stop_id}`)
-                .on('click', () => selectStation(stopId));
-                
-                markers.addLayer(marker);
-            });
-            
-            map.addLayer(markers);
+            try {
+                const nearestStops = findNearestStops(lat, lng, k);
+                const routeIds = await getRoutesForStops(nearestStops.map(s => s.stop_id));
+                await drawRoutesAndStops(nearestStops, routeIds);
 
-            // Center and zoom the map to fit all markers
-            map.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
-            
-            document.getElementById('map-overlay').style.display = 'none';
-
-            // Automatically select the first station to populate the right panel
-            const firstStopId = stopIds.sort((a, b) => processedStopData[a].stop_seq - processedStopData[b].stop_seq)[0];
-            selectStation(firstStopId);
+                overlay.style.display = "none";
+            } catch (err) {
+                console.error(err);
+                overlay.textContent = "Error loading routes. See console for details.";
+            }
         }
 
-        // --- Station Click Handler and Chart Generation ---
-        
-        function selectStation(stopId) {
-            const stop = processedStopData[stopId];
+        function findNearestStops(lat, lon, k) {
+            const all = [];
+            for (const stopId in stopLocations) {
+                const [sLat, sLon] = stopLocations[stopId];
+                const dist = euclideanDistance(lat, lon, sLat, sLon);
+                all.push({ stop_id: stopId, lat: sLat, lon: sLon, dist });
+            }
+            all.sort((a, b) => a.dist - b.dist);
+            return all.slice(0, k);
+        }
 
-            // 1. Update Info Panel
-            document.getElementById('selected-stop-info').innerText = `Selected Stop: #${stop.stop_seq} (ID: ${stop.stop_id})`;
-            document.getElementById('chart-message').style.display = 'none';
-            document.getElementById('chart-area').style.display = 'block';
+        async function getRoutesForStops(stopIds) {
+            const routeSet = new Set();
+            await Promise.all(stopIds.map(async (sid) => {
+                if (!stopRouteMappingCache[sid]) {
+                    const url = `${STOP_ROUTE_MAPPING_BASE}/${sid}.json`;
+                    const res = await fetch(url);
+                    if (!res.ok) {
+                        console.warn(`No stop_route_mapping for stop ${sid}`);
+                        stopRouteMappingCache[sid] = [];
+                    } else {
+                        stopRouteMappingCache[sid] = await res.json();
+                    }
+                }
+                stopRouteMappingCache[sid].forEach(rid => routeSet.add(rid));
+            }));
+            return Array.from(routeSet);
+        }
 
-            // 2. Process data for the three charts
-            const { dailyData, allStopAverages, delayBuckets } = aggregateDelayData(stopId);
+        async function drawRoutesAndStops(nearestStops, routeIds) {
+            // Clear old layers & indices
+            routesLayerGroup.clearLayers();
+            stopsLayerGroup.clearLayers();
+            routeLayerIndex = {};
+            stopMarkerIndex = {};
+            selectedRouteId = null;
+            updateSelectedRouteInfo(null);
+            updateSelectedStopInfo(null);
+            clearCharts();
 
-            // 3. Render Charts
-            renderDailyDelayChart(dailyData, stop.stop_id);
-            renderStopAvgDelayChart(allStopAverages, stop.stop_id);
-            renderDelayDistributionChart(delayBuckets, stop.stop_id);
-            
-            // Optional: Visually highlight the selected marker
-            markers.eachLayer(layer => {
-                const popupContent = layer.getPopup() ? layer.getPopup().getContent() : '';
-                const isSelected = popupContent.includes(stopId);
-                layer.setStyle({ 
-                    color: isSelected ? '#e74c3c' : '#3498db',
-                    fillColor: isSelected ? '#e74c3c' : '#3498db',
-                    radius: isSelected ? 10 : 8
+            // For each route, get stop sequences
+            await Promise.all(routeIds.map(async (rid) => {
+                if (!routeStopMappingCache[rid]) {
+                    const url = `${ROUTE_STOP_MAPPING_BASE}/${rid}.json`;
+                    const res = await fetch(url);
+                    if (!res.ok) {
+                        console.warn(`No route_stop_mapping for route ${rid}`);
+                        routeStopMappingCache[rid] = [];
+                    } else {
+                        routeStopMappingCache[rid] = await res.json();
+                    }
+                }
+            }));
+
+            // Aggregate stops & build polylines
+            const bounds = [];
+            routeIds.forEach(routeId => {
+                const sequences = routeStopMappingCache[routeId] || [];
+                const routeMeta = routesMetadata[routeId] || {};
+                const color = routeMeta.color || "#2980b9";
+
+                routeLayerIndex[routeId] = [];
+
+                sequences.forEach(seq => {
+                    const latlngs = [];
+                    seq.forEach(stopId => {
+                        const loc = stopLocations[stopId];
+                        if (!loc) return;
+                        const [lat, lon] = loc;
+                        latlngs.push([lat, lon]);
+                        bounds.push([lat, lon]);
+
+                        if (!stopMarkerIndex[stopId]) {
+                            const stopMeta = stopsMetadata[stopId] || {};
+                            const nearestTag = nearestStops.some(ns => ns.stop_id === stopId)
+                                ? "<br><b>Near click</b>"
+                                : "";
+
+                            const marker = L.circleMarker([lat, lon], {
+                                radius: 6,
+                                color: '#34495e',
+                                fillColor: '#3498db',
+                                fillOpacity: 0.9
+                            })
+                                .bindPopup(
+                                    `<b>${stopMeta.name || 'Stop ' + stopId}</b><br>` +
+                                    `Stop ID: ${stopId}${nearestTag}` +
+                                    (stopMeta.link ? `<br><a href="${stopMeta.link}" target="_blank">Info</a>` : "")
+                                )
+                                .on('click', () => onStopClick(stopId));
+
+                            stopsLayerGroup.addLayer(marker);
+                            stopMarkerIndex[stopId] = {
+                                marker,
+                                routes: new Set()
+                            };
+                        }
+                        stopMarkerIndex[stopId].routes.add(routeId);
+                    });
+
+                    if (latlngs.length >= 2) {
+                        const polyline = L.polyline(latlngs, {
+                            color: color,
+                            weight: 4,
+                            opacity: 0.85
+                        }).on('click', (e) => {
+                            L.DomEvent.stopPropagation(e); // don't trigger map click
+                            onRouteClick(routeId);
+                        });
+
+                        polyline.bindTooltip(
+                            `${routeMeta.name || 'Route ' + routeId}`,
+                            { sticky: true }
+                        );
+
+                        routesLayerGroup.addLayer(polyline);
+                        routeLayerIndex[routeId].push(polyline);
+                    }
+                });
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40] });
+            }
+        }
+
+        // ---- Route / Stop selection ----
+        function updateSelectedRouteInfo(routeId) {
+            const el = document.getElementById("selected-route-info");
+            if (!routeId) {
+                el.innerHTML = '<span class="status-label">Selected route:</span> None';
+                return;
+            }
+            const meta = routesMetadata[routeId] || {};
+            const label = meta.name || routeId;
+            const link = meta.link
+                ? ` (<a href="${meta.link}" target="_blank">route info</a>)`
+                : "";
+            el.innerHTML = `<span class="status-label">Selected route:</span> ${label} [${routeId}]${link}`;
+        }
+
+        function updateSelectedStopInfo(stopId) {
+            const el = document.getElementById("selected-stop-info");
+            if (!stopId) {
+                el.innerHTML = '<span class="status-label">Selected stop:</span> None';
+                return;
+            }
+            const meta = stopsMetadata[stopId] || {};
+            const label = meta.name || stopId;
+            const link = meta.link
+                ? ` (<a href="${meta.link}" target="_blank">stop info</a>)`
+                : "";
+            el.innerHTML = `<span class="status-label">Selected stop:</span> ${label} [${stopId}]${link}`;
+        }
+
+        function onRouteClick(routeId) {
+            selectedRouteId = routeId;
+            updateSelectedRouteInfo(routeId);
+            styleRoutesAndStopsForSelection();
+        }
+
+        function styleRoutesAndStopsForSelection() {
+            // Routes
+            Object.keys(routeLayerIndex).forEach(rid => {
+                const meta = routesMetadata[rid] || {};
+                const baseColor = meta.color || "#2980b9";
+                const isSelected = selectedRouteId && rid === selectedRouteId;
+
+                routeLayerIndex[rid].forEach(line => {
+                    line.setStyle({
+                        color: isSelected ? baseColor : "#bdc3c7",
+                        opacity: isSelected ? 0.9 : 0.2,
+                        weight: isSelected ? 5 : 3
+                    });
+                    if (isSelected) line.bringToFront();
+                });
+            });
+
+            // Stops
+            Object.keys(stopMarkerIndex).forEach(sid => {
+                const entry = stopMarkerIndex[sid];
+                const isOnSelected = !selectedRouteId || entry.routes.has(selectedRouteId);
+                entry.marker.setStyle({
+                    radius: isOnSelected ? 6 : 4,
+                    fillOpacity: isOnSelected ? 0.9 : 0.25,
+                    color: isOnSelected ? '#34495e' : '#bdc3c7',
+                    fillColor: isOnSelected ? '#3498db' : '#ecf0f1'
                 });
             });
         }
-        
-        function aggregateDelayData(selectedStopId) {
-            const selectedStop = processedStopData[selectedStopId];
-            const measurements = selectedStop.measurements;
-            
-            // --- 1. Daily Delay Data (for Chart 1) ---
-            const dailyGrouped = measurements.reduce((acc, curr) => {
-                if (!acc[curr.date]) {
-                    acc[curr.date] = [];
-                }
-                acc[curr.date].push(curr.delay_min);
-                return acc;
-            }, {});
-            
-            const dailyData = {
-                dates: [],
-                avg: [],
-                min: [],
-                max: []
-            };
 
-            Object.keys(dailyGrouped).sort().forEach(date => {
-                const delays = dailyGrouped[date];
-                const sum = delays.reduce((a, b) => a + b, 0);
-                dailyData.dates.push(date);
-                dailyData.avg.push(sum / delays.length);
-                dailyData.min.push(Math.min(...delays));
-                dailyData.max.push(Math.max(...delays));
-            });
-
-            // --- 2. Stop-by-Stop Average (for Chart 2) ---
-            const allStopAverages = [];
-            const allStops = Object.values(processedStopData).sort((a, b) => a.stop_seq - b.stop_seq);
-            
-            allStops.forEach(stop => {
-                const sum = stop.measurements.reduce((a, b) => a + b.delay_min, 0);
-                const avgDelay = sum / stop.measurements.length;
-                allStopAverages.push({
-                    stop_seq: stop.stop_seq,
-                    stop_id: stop.stop_id, // include stop_id for reference
-                    avg_delay: avgDelay
-                });
-            });
-            
-            // --- 3. Delay Distribution (for Chart 3) ---
-            const measurementsAllDelays = measurements.map(m => m.delay_min);
-            const bucketSize = 5; // 5 minute intervals
-
-            const bucketCounts = {};
-            
-            measurementsAllDelays.forEach(m => {
-                // Determine the start of the bucket (e.g., -10.3 -> -15.0 if bucketSize is 5)
-                const bucketStart = Math.floor(m / bucketSize) * bucketSize;
-                const bucketLabel = `${bucketStart} to ${bucketStart + bucketSize} sec`;
-
-                if (!bucketCounts[bucketLabel]) {
-                    bucketCounts[bucketLabel] = 0;
-                }
-                bucketCounts[bucketLabel]++;
-            });
-
-            const delayBuckets = {
-                // Sort buckets numerically based on the starting value
-                labels: Object.keys(bucketCounts).sort((a, b) => {
-                    const aStart = parseFloat(a.split(' ')[0]);
-                    const bStart = parseFloat(b.split(' ')[0]);
-                    return aStart - bStart;
-                }),
-                data: Object.keys(bucketCounts).sort((a, b) => {
-                    const aStart = parseFloat(a.split(' ')[0]);
-                    const bStart = parseFloat(b.split(' ')[0]);
-                    return aStart - bStart;
-                }).map(key => bucketCounts[key])
-            };
-
-            return { dailyData, allStopAverages, delayBuckets };
+        function clearRouteSelection() {
+            selectedRouteId = null;
+            updateSelectedRouteInfo(null);
+            styleRoutesAndStopsForSelection();
+            clearCharts();
+            updateSelectedStopInfo(null);
+            document.getElementById("chart-message").style.display = "block";
+            document.getElementById("chart-area").style.display = "none";
         }
-        
-        function renderDailyDelayChart(data, stopId) {
-            const ctx = document.getElementById('dailyDelayChart').getContext('2d');
+
+        async function onStopClick(stopId) {
+            if (!selectedRouteId) {
+                alert("Please select a route first (click on a route line), then click a stop.");
+                return;
+            }
+            updateSelectedStopInfo(stopId);
+
+            try {
+                const samplesDir0 = await getDelaySamples(selectedRouteId, 0, stopId);
+                const samplesDir1 = await getDelaySamples(selectedRouteId, 1, stopId);
+
+                const anyData = (samplesDir0.length + samplesDir1.length) > 0;
+                if (!anyData) {
+                    alert("No delay data found for this route / direction / stop combination.");
+                    return;
+                }
+
+                document.getElementById("chart-message").style.display = "none";
+                document.getElementById("chart-area").style.display = "block";
+
+                renderCharts(samplesDir0, samplesDir1);
+            } catch (err) {
+                console.error(err);
+                alert("Error loading delay data for this stop.");
+            }
+        }
+
+        // ---- Delay fetching & processing ----
+        async function getDelaySamples(routeId, directionId, stopId) {
+            const key = `${routeId}_${directionId}_${stopId}`;
+            if (delayDataCache[key]) return delayDataCache[key];
+
+            const url = `${ROUTE_DIR_STOP_DELAY_BASE}/${routeId}/${directionId}/${stopId}.json`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                console.warn(`No delay data for ${key}`);
+                delayDataCache[key] = [];
+                return [];
+            }
+            const raw = await res.json();
+            // raw format: [[unix_time, delay_sec], ...]
+            const samples = raw.map(([t, d]) => ({
+                t,
+                delay: -d  // invert polarity as requested
+            }));
+            delayDataCache[key] = samples;
+            return samples;
+        }
+
+        function clearCharts() {
+            if (hourlyDelayChart) {
+                hourlyDelayChart.destroy();
+                hourlyDelayChart = null;
+            }
             if (dailyDelayChart) {
                 dailyDelayChart.destroy();
+                dailyDelayChart = null;
+            }
+        }
+
+        function renderCharts(samplesDir0, samplesDir1) {
+            clearCharts();
+
+            // Hourly groups
+            const hourlyBuckets0 = groupByHour(samplesDir0);
+            const hourlyBuckets1 = groupByHour(samplesDir1);
+
+            const hourLabels = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, "0") + ":00");
+            const hourlyMean0 = [];
+            const hourlyStd0 = [];
+            const hourlyMean1 = [];
+            const hourlyStd1 = [];
+
+            for (let h = 0; h < 24; h++) {
+                const stats0 = computeMeanStd(hourlyBuckets0[h]);
+                const stats1 = computeMeanStd(hourlyBuckets1[h]);
+                hourlyMean0.push(stats0.mean);
+                hourlyStd0.push(stats0.std);
+                hourlyMean1.push(stats1.mean);
+                hourlyStd1.push(stats1.std);
             }
 
-            dailyDelayChart = new Chart(ctx, {
-                type: 'line',
+            // Daily groups
+            const dailyGroups0 = groupByDate(samplesDir0);
+            const dailyGroups1 = groupByDate(samplesDir1);
+
+            const allDatesSet = new Set([
+                ...Object.keys(dailyGroups0),
+                ...Object.keys(dailyGroups1)
+            ]);
+            const dateLabels = Array.from(allDatesSet).sort();
+
+            const dailyMean0 = [];
+            const dailyStd0 = [];
+            const dailyMean1 = [];
+            const dailyStd1 = [];
+
+            dateLabels.forEach(dateStr => {
+                const stats0 = computeMeanStd(dailyGroups0[dateStr] || []);
+                const stats1 = computeMeanStd(dailyGroups1[dateStr] || []);
+                dailyMean0.push(stats0.mean);
+                dailyStd0.push(stats0.std);
+                dailyMean1.push(stats1.mean);
+                dailyStd1.push(stats1.std);
+            });
+
+            renderHourlyChart(hourLabels, hourlyMean0, hourlyStd0, hourlyMean1, hourlyStd1);
+            renderDailyChart(dateLabels, dailyMean0, dailyStd0, dailyMean1, dailyStd1);
+        }
+
+        function renderHourlyChart(labels, mean0, std0, mean1, std1) {
+            const ctx = document.getElementById("hourlyDelayChart").getContext("2d");
+
+            const upper0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m + std0[i] : null);
+            const lower0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m - std0[i] : null);
+            const upper1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m + std1[i] : null);
+            const lower1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m - std1[i] : null);
+
+            hourlyDelayChart = new Chart(ctx, {
+                type: "line",
                 data: {
-                    labels: data.dates,
+                    labels,
                     datasets: [
+                        // Direction 0 band
                         {
-                            label: 'Average Delay (sec)',
-                            data: data.avg,
-                            borderColor: '#3498db',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            label: "Dir 0 Mean",
+                            data: mean0,
                             borderWidth: 2,
                             fill: false,
-                            tension: 0.3,
-                            order: 1 
+                            tension: 0.25
                         },
                         {
-                            label: 'Max Delay (sec)',
-                            data: data.max,
-                            borderColor: 'transparent',
-                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            label: "Dir 0 Upper",
+                            data: upper0,
                             borderWidth: 0,
-                            fill: 'origin',
-                            pointRadius: 0,
-                            order: 2 
+                            fill: "origin",
+                            tension: 0.25
                         },
                         {
-                            label: 'Min Delay (sec)',
-                            data: data.min,
-                            borderColor: 'transparent',
-                            backgroundColor: 'transparent',
+                            label: "Dir 0 Lower",
+                            data: lower0,
                             borderWidth: 0,
-                            fill: '-1',
-                            pointRadius: 0,
-                            order: 3
+                            fill: "-1",
+                            tension: 0.25
+                        },
+                        // Direction 1 band
+                        {
+                            label: "Dir 1 Mean",
+                            data: mean1,
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.25
+                        },
+                        {
+                            label: "Dir 1 Upper",
+                            data: upper1,
+                            borderWidth: 0,
+                            fill: "origin",
+                            tension: 0.25
+                        },
+                        {
+                            label: "Dir 1 Lower",
+                            data: lower1,
+                            borderWidth: 0,
+                            fill: "-1",
+                            tension: 0.25
                         }
                     ]
                 },
@@ -542,141 +803,120 @@
                     plugins: {
                         legend: {
                             labels: {
-                                filter: (item, chart) => {
-                                    return item.datasetIndex === 0; 
-                                }
-                            }
-                        },
-                        annotation: {
-                            annotations: {
-                                line1: {
-                                    type: 'line',
-                                    yMin: 0,
-                                    yMax: 0,
-                                    borderColor: 'rgba(46, 204, 113, 0.8)',
-                                    borderWidth: 2,
-                                    label: {
-                                        content: 'On-Time (0 sec)',
-                                        enabled: true,
-                                        position: 'start'
-                                    }
+                                filter: (item) => {
+                                    // show only mean labels in legend
+                                    return item.datasetIndex === 0 || item.datasetIndex === 3;
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
-                            display: true,
-                            title: { display: true, text: 'Date' }
+                            title: { display: true, text: "Hour of day" }
                         },
                         y: {
-                            display: true,
-                            title: { display: true, text: 'Delay (sec)' }
+                            title: { display: true, text: "Delay (sec, polarity flipped)" }
                         }
                     }
                 }
             });
         }
-        
-        function renderStopAvgDelayChart(data, stopId) {
-            const ctx = document.getElementById('stopAvgDelayChart').getContext('2d');
-            if (stopAvgDelayChart) {
-                stopAvgDelayChart.destroy();
-            }
-            
-            const labels = data.map(d => `Stop #${d.stop_seq}`);
-            const values = data.map(d => d.avg_delay);
-            const stopColors = data.map(d => d.stop_id === stopId ? '#f39c12' : (d.avg_delay > 0 ? '#e74c3c' : (d.avg_delay < 0 ? '#2ecc71' : '#f1c40f')));
 
-            stopAvgDelayChart = new Chart(ctx, {
-                type: 'bar',
+        function renderDailyChart(labels, mean0, std0, mean1, std1) {
+            const ctx = document.getElementById("dailyDelayChart").getContext("2d");
+
+            const upper0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m + std0[i] : null);
+            const lower0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m - std0[i] : null);
+            const upper1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m + std1[i] : null);
+            const lower1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m - std1[i] : null);
+
+            dailyDelayChart = new Chart(ctx, {
+                type: "line",
                 data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Avg Delay (sec)',
-                        data: values,
-                        backgroundColor: stopColors,
-                        borderColor: '#2c3e50',
-                        borderWidth: 1
-                    }]
+                    labels,
+                    datasets: [
+                        // Dir 0
+                        {
+                            label: "Dir 0 Mean",
+                            data: mean0,
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.25
+                        },
+                        {
+                            label: "Dir 0 Upper",
+                            data: upper0,
+                            borderWidth: 0,
+                            fill: "origin",
+                            tension: 0.25
+                        },
+                        {
+                            label: "Dir 0 Lower",
+                            data: lower0,
+                            borderWidth: 0,
+                            fill: "-1",
+                            tension: 0.25
+                        },
+                        // Dir 1
+                        {
+                            label: "Dir 1 Mean",
+                            data: mean1,
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.25
+                        },
+                        {
+                            label: "Dir 1 Upper",
+                            data: upper1,
+                            borderWidth: 0,
+                            fill: "origin",
+                            tension: 0.25
+                        },
+                        {
+                            label: "Dir 1 Lower",
+                            data: lower1,
+                            borderWidth: 0,
+                            fill: "-1",
+                            tension: 0.25
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
-                        annotation: {
-                            annotations: {
-                                zeroLine: {
-                                    type: 'line',
-                                    yMin: 0,
-                                    yMax: 0,
-                                    borderColor: 'rgba(0,0,0,0.5)',
-                                    borderWidth: 1
+                        legend: {
+                            labels: {
+                                filter: (item) => {
+                                    return item.datasetIndex === 0 || item.datasetIndex === 3;
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
-                            display: true,
-                            title: { display: true, text: 'Stop Sequence' }
+                            title: { display: true, text: "Date" }
                         },
                         y: {
-                            display: true,
-                            title: { display: true, text: 'Average Delay (sec)' }
+                            title: { display: true, text: "Delay (sec, polarity flipped)" }
                         }
                     }
                 }
             });
         }
 
-        function renderDelayDistributionChart(data, stopId) {
-            const ctx = document.getElementById('delayDistributionChart').getContext('2d');
-            if (delayDistributionChart) {
-                delayDistributionChart.destroy();
-            }
+        // ---- Init ----
+        document.addEventListener("DOMContentLoaded", () => {
+            initMap();
+            loadMetadata();
 
-            delayDistributionChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        label: 'Number of Observations',
-                        data: data.data,
-                        backgroundColor: '#9b59b6',
-                        borderColor: '#8e44ad',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            title: { display: true, text: 'Delay Range (sec)' }
-                        },
-                        y: {
-                            display: true,
-                            title: { display: true, text: 'Frequency' },
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
+            const clearBtn = document.getElementById("clear-route-btn");
+            clearBtn.addEventListener("click", clearRouteSelection);
 
-        // Initialize tabs to show 'Delays' on load
-        document.addEventListener('DOMContentLoaded', () => {
-            // Use querySelector to ensure we find the first element with the active class
-            const activeTabButton = document.querySelector('.tabs .tab-button.active');
+            // activate Delays tab properly on load
+            const activeTabButton = document.querySelector(".tabs .tab-button.active");
             if (activeTabButton) {
-                // Pass a simulated event object to the openTab function for initial load
-                openTab({ currentTarget: activeTabButton }, 'delays');
+                openTab({ currentTarget: activeTabButton }, "delays");
             }
         });
     </script>

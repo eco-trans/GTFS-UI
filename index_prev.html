@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTFS Delay Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        /* General Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .dashboard-container {
+            display: flex;
+            height: 100vh;
+            padding: 15px;
+            gap: 15px;
+        }
+        
+        /* Map Container (Left - A) */
+        .map-container {
+            flex: 2;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Dashboard Content (Right - B) - CSS FIX 1: Set min-height to 0 and flex-direction to column */
+        .data-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* Important for flex-grow within 100vh container */
+            border-radius: 10px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Contains children */
+        }
+
+        .controls {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-shrink: 0; /* Don't shrink the controls */
+        }
+
+        .controls label {
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #333;
+        }
+
+        .controls select, .controls input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+        }
+
+        .controls button {
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .controls button:hover {
+            background-color: #2980b9;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0; /* Don't shrink the tabs */
+        }
+        
+        .tab-button {
+            padding: 15px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #7f8c8d;
+            transition: color 0.2s, border-bottom 0.2s;
+        }
+        
+        .tab-button.active {
+            color: #3498db;
+            border-bottom: 3px solid #3498db;
+        }
+        
+        /* CSS FIX 2: Set overflow-y: auto for the tab content */
+        .tab-content {
+            padding: 15px;
+            display: none;
+            overflow-y: auto; /* Enables vertical scrolling */
+            flex-grow: 1; /* Takes up remaining vertical space */
+            min-height: 0; /* Crucial for flex scrolling containers */
+        }
+        
+        .tab-content.active {
+            display: flex; /* Use flex to allow chart-area to grow */
+            flex-direction: column;
+        }
+        
+        .chart-container {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #fcfcfc;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            /* CSS FIX 3: Set a fixed height for the chart container to prevent infinite growth */
+            height: 350px; 
+            max-height: 50vh; /* Optional: adds a relative limit */
+        }
+
+        .chart-container h2 {
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="map-container">
+            <div id="map"></div>
+            <div id="map-overlay" class="map-overlay">
+                Please select a City and enter a Trip ID to load data.
+            </div>
+        </div>
+        
+        <div class="data-container">
+            <div class="controls">
+                <label for="city-select">Select City:</label>
+                <select id="city-select">
+                    <option value="Atlanta">Atlanta</option>
+                    <option value="New York City">New York City</option>
+                    <option value="Salt Lake City">Salt Lake City</option>
+                    <option value="San Francisco">San Francisco</option>
+                </select>
+
+                <label for="trip-id-input">Enter Trip ID:</label>
+                <input type="text" id="trip-id-input" placeholder="e.g., 12345678">
+
+                <button onclick="fetchAndRenderData()">Load Trip Data</button> 
+
+                <div id="selected-stop-info" style="margin-top: 10px; font-weight: bold; color: #2980b9;">
+                    Selected Stop: None
+                </div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab-button active" onclick="openTab(event, 'delays')">Delays</div>
+                <div class="tab-button" onclick="openTab(event, 'accessibility')">Accessibility</div>
+                <div class="tab-button" onclick="openTab(event, 'reliability')">Reliability</div>
+            </div>
+
+            <div id="delays" class="tab-content active">
+                <p id="chart-message" style="flex-shrink: 0;">Click a station (point) on the map to see its delay analysis.</p>
+                
+                <div id="chart-area" style="display: none;">
+                    <div class="chart-container">
+                        <h2>Daily Delay Time Series (Selected Stop)</h2>
+                        <canvas id="dailyDelayChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h2>Stop-by-Stop Average Delay (Full Trip)</h2>
+                        <canvas id="stopAvgDelayChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h2>Delay Distribution (Selected Stop)</h2>
+                        <canvas id="delayDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="accessibility" class="tab-content">
+                <p>Accessibility information will be displayed here.</p>
+            </div>
+            <div id="reliability" class="tab-content">
+                <p>Reliability metrics will be displayed here.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Initialization ---
+        let map;
+        let markers = new L.FeatureGroup();
+        let currentTripData = {}; 
+        let processedStopData = {}; 
+        let dailyDelayChart, stopAvgDelayChart, delayDistributionChart;
+
+        // Leaflet map setup (Canvas A)
+        map = L.map('map').setView([39.8283, -98.5795], 4); // Center of US
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // --- Utility Functions ---
+
+        function openTab(evt, tabName) {
+            // Get all elements with class="tab-content" and hide them
+            let tabcontent = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            // Get all elements with class="tab-button" and remove the class "active"
+            let tabbuttons = document.getElementsByClassName("tab-button");
+            // FIXED: The loop condition was wrong (i = 0 < tabbuttons.length)
+            for (let i = 0; i < tabbuttons.length; i++) { 
+                tabbuttons[i].className = tabbuttons[i].className.replace(" active", "");
+            }
+
+            // Show the current tab, and add an "active" class to the button that opened the tab
+            const targetTab = document.getElementById(tabName);
+            if (targetTab) {
+                targetTab.style.display = "flex";
+            }
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.className += " active";
+            }
+        }
+
+        function cityToURL(cityName) {
+            return cityName.toLowerCase().replace(/ /g, '_');
+        }
+
+        // --- Data Fetching and Processing ---
+
+        async function fetchAndRenderData() {
+            const citySelect = document.getElementById('city-select');
+            const tripIdInput = document.getElementById('trip-id-input');
+            const city = citySelect.value;
+            const tripId = tripIdInput.value;
+
+            if (!city || !tripId) {
+                alert('Please select a City and enter a Trip ID.');
+                return;
+            }
+
+            // 1. Construct the URL
+            const cityURL = cityToURL(city);
+            const dataURL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/delay/${cityURL}/${tripId}.json`;
+            
+            document.getElementById('map-overlay').innerText = `Fetching data for ${city} (Trip ID: ${tripId})...`;
+            document.getElementById('map-overlay').style.display = 'flex';
+            
+            try {
+                // 2. Fetch the data
+                const response = await fetch(dataURL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                currentTripData = await response.json();
+
+                // 3. Process the data
+                processStopData(currentTripData.data);
+                
+                // 4. Update the map (Canvas A)
+                updateMap();
+
+                // 5. Clear right panel initial state
+                document.getElementById('selected-stop-info').innerText = 'Selected Stop: None';
+                document.getElementById('chart-message').style.display = 'block';
+                document.getElementById('chart-area').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Error fetching or processing data:', error);
+                document.getElementById('map-overlay').innerText = `Error loading data. Check City/Trip ID. (${error.message})`;
+            }
+        }
+
+        function processStopData(data) {
+            processedStopData = {};
+            
+            // data format: [stop sequence, stop id, lat, lng, timestamp for data collection, delay in sec]
+            data.forEach(item => {
+                const [stop_seq, stop_id, lat, lng, timestamp, delay_sec] = item;
+                // Use ISO string for a stable date format (YYYY-MM-DD)
+                const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+
+                if (!processedStopData[stop_id]) {
+                    processedStopData[stop_id] = {
+                        stop_id: stop_id,
+                        stop_seq: parseInt(stop_seq),
+                        lat: lat,
+                        lng: lng,
+                        measurements: []
+                    };
+                }
+                
+                // Store measurement with date
+                processedStopData[stop_id].measurements.push({
+                    timestamp: timestamp,
+                    date: date,
+                    delay_min: delay_sec
+                });
+            });
+        }
+        
+        function updateMap() {
+            // Clear existing markers
+            markers.clearLayers();
+            map.removeLayer(markers);
+            
+            const stopIds = Object.keys(processedStopData);
+            if (stopIds.length === 0) {
+                document.getElementById('map-overlay').innerText = 'No stop data found for this trip.';
+                return;
+            }
+
+            let bounds = [];
+
+            // Add new markers (Canvas A - Points)
+            stopIds.forEach(stopId => {
+                const stop = processedStopData[stopId];
+                const latLng = [stop.lat, stop.lng];
+                bounds.push(latLng);
+
+                const marker = L.circleMarker(latLng, {
+                    radius: 8,
+                    color: '#3498db',
+                    fillColor: '#3498db',
+                    fillOpacity: 0.8
+                })
+                .bindPopup(`Stop Sequence: ${stop.stop_seq}<br>Stop ID: ${stop.stop_id}`)
+                .on('click', () => selectStation(stopId));
+                
+                markers.addLayer(marker);
+            });
+            
+            map.addLayer(markers);
+
+            // Center and zoom the map to fit all markers
+            map.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
+            
+            document.getElementById('map-overlay').style.display = 'none';
+
+            // Automatically select the first station to populate the right panel
+            const firstStopId = stopIds.sort((a, b) => processedStopData[a].stop_seq - processedStopData[b].stop_seq)[0];
+            selectStation(firstStopId);
+        }
+
+        // --- Station Click Handler and Chart Generation ---
+        
+        function selectStation(stopId) {
+            const stop = processedStopData[stopId];
+
+            // 1. Update Info Panel
+            document.getElementById('selected-stop-info').innerText = `Selected Stop: #${stop.stop_seq} (ID: ${stop.stop_id})`;
+            document.getElementById('chart-message').style.display = 'none';
+            document.getElementById('chart-area').style.display = 'block';
+
+            // 2. Process data for the three charts
+            const { dailyData, allStopAverages, delayBuckets } = aggregateDelayData(stopId);
+
+            // 3. Render Charts
+            renderDailyDelayChart(dailyData, stop.stop_id);
+            renderStopAvgDelayChart(allStopAverages, stop.stop_id);
+            renderDelayDistributionChart(delayBuckets, stop.stop_id);
+            
+            // Optional: Visually highlight the selected marker
+            markers.eachLayer(layer => {
+                const popupContent = layer.getPopup() ? layer.getPopup().getContent() : '';
+                const isSelected = popupContent.includes(stopId);
+                layer.setStyle({ 
+                    color: isSelected ? '#e74c3c' : '#3498db',
+                    fillColor: isSelected ? '#e74c3c' : '#3498db',
+                    radius: isSelected ? 10 : 8
+                });
+            });
+        }
+        
+        function aggregateDelayData(selectedStopId) {
+            const selectedStop = processedStopData[selectedStopId];
+            const measurements = selectedStop.measurements;
+            
+            // --- 1. Daily Delay Data (for Chart 1) ---
+            const dailyGrouped = measurements.reduce((acc, curr) => {
+                if (!acc[curr.date]) {
+                    acc[curr.date] = [];
+                }
+                acc[curr.date].push(curr.delay_min);
+                return acc;
+            }, {});
+            
+            const dailyData = {
+                dates: [],
+                avg: [],
+                min: [],
+                max: []
+            };
+
+            Object.keys(dailyGrouped).sort().forEach(date => {
+                const delays = dailyGrouped[date];
+                const sum = delays.reduce((a, b) => a + b, 0);
+                dailyData.dates.push(date);
+                dailyData.avg.push(sum / delays.length);
+                dailyData.min.push(Math.min(...delays));
+                dailyData.max.push(Math.max(...delays));
+            });
+
+            // --- 2. Stop-by-Stop Average (for Chart 2) ---
+            const allStopAverages = [];
+            const allStops = Object.values(processedStopData).sort((a, b) => a.stop_seq - b.stop_seq);
+            
+            allStops.forEach(stop => {
+                const sum = stop.measurements.reduce((a, b) => a + b.delay_min, 0);
+                const avgDelay = sum / stop.measurements.length;
+                allStopAverages.push({
+                    stop_seq: stop.stop_seq,
+                    stop_id: stop.stop_id, // include stop_id for reference
+                    avg_delay: avgDelay
+                });
+            });
+            
+            // --- 3. Delay Distribution (for Chart 3) ---
+            const measurementsAllDelays = measurements.map(m => m.delay_min);
+            const bucketSize = 5; // 5 minute intervals
+
+            const bucketCounts = {};
+            
+            measurementsAllDelays.forEach(m => {
+                // Determine the start of the bucket (e.g., -10.3 -> -15.0 if bucketSize is 5)
+                const bucketStart = Math.floor(m / bucketSize) * bucketSize;
+                const bucketLabel = `${bucketStart} to ${bucketStart + bucketSize} sec`;
+
+                if (!bucketCounts[bucketLabel]) {
+                    bucketCounts[bucketLabel] = 0;
+                }
+                bucketCounts[bucketLabel]++;
+            });
+
+            const delayBuckets = {
+                // Sort buckets numerically based on the starting value
+                labels: Object.keys(bucketCounts).sort((a, b) => {
+                    const aStart = parseFloat(a.split(' ')[0]);
+                    const bStart = parseFloat(b.split(' ')[0]);
+                    return aStart - bStart;
+                }),
+                data: Object.keys(bucketCounts).sort((a, b) => {
+                    const aStart = parseFloat(a.split(' ')[0]);
+                    const bStart = parseFloat(b.split(' ')[0]);
+                    return aStart - bStart;
+                }).map(key => bucketCounts[key])
+            };
+
+            return { dailyData, allStopAverages, delayBuckets };
+        }
+        
+        function renderDailyDelayChart(data, stopId) {
+            const ctx = document.getElementById('dailyDelayChart').getContext('2d');
+            if (dailyDelayChart) {
+                dailyDelayChart.destroy();
+            }
+
+            dailyDelayChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [
+                        {
+                            label: 'Average Delay (sec)',
+                            data: data.avg,
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            order: 1 
+                        },
+                        {
+                            label: 'Max Delay (sec)',
+                            data: data.max,
+                            borderColor: 'transparent',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            borderWidth: 0,
+                            fill: 'origin',
+                            pointRadius: 0,
+                            order: 2 
+                        },
+                        {
+                            label: 'Min Delay (sec)',
+                            data: data.min,
+                            borderColor: 'transparent',
+                            backgroundColor: 'transparent',
+                            borderWidth: 0,
+                            fill: '-1',
+                            pointRadius: 0,
+                            order: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                filter: (item, chart) => {
+                                    return item.datasetIndex === 0; 
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 0,
+                                    yMax: 0,
+                                    borderColor: 'rgba(46, 204, 113, 0.8)',
+                                    borderWidth: 2,
+                                    label: {
+                                        content: 'On-Time (0 sec)',
+                                        enabled: true,
+                                        position: 'start'
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: 'Date' }
+                        },
+                        y: {
+                            display: true,
+                            title: { display: true, text: 'Delay (sec)' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderStopAvgDelayChart(data, stopId) {
+            const ctx = document.getElementById('stopAvgDelayChart').getContext('2d');
+            if (stopAvgDelayChart) {
+                stopAvgDelayChart.destroy();
+            }
+            
+            const labels = data.map(d => `Stop #${d.stop_seq}`);
+            const values = data.map(d => d.avg_delay);
+            const stopColors = data.map(d => d.stop_id === stopId ? '#f39c12' : (d.avg_delay > 0 ? '#e74c3c' : (d.avg_delay < 0 ? '#2ecc71' : '#f1c40f')));
+
+            stopAvgDelayChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Avg Delay (sec)',
+                        data: values,
+                        backgroundColor: stopColors,
+                        borderColor: '#2c3e50',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        annotation: {
+                            annotations: {
+                                zeroLine: {
+                                    type: 'line',
+                                    yMin: 0,
+                                    yMax: 0,
+                                    borderColor: 'rgba(0,0,0,0.5)',
+                                    borderWidth: 1
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: 'Stop Sequence' }
+                        },
+                        y: {
+                            display: true,
+                            title: { display: true, text: 'Average Delay (sec)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderDelayDistributionChart(data, stopId) {
+            const ctx = document.getElementById('delayDistributionChart').getContext('2d');
+            if (delayDistributionChart) {
+                delayDistributionChart.destroy();
+            }
+
+            delayDistributionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Number of Observations',
+                        data: data.data,
+                        backgroundColor: '#9b59b6',
+                        borderColor: '#8e44ad',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: 'Delay Range (sec)' }
+                        },
+                        y: {
+                            display: true,
+                            title: { display: true, text: 'Frequency' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize tabs to show 'Delays' on load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Use querySelector to ensure we find the first element with the active class
+            const activeTabButton = document.querySelector('.tabs .tab-button.active');
+            if (activeTabButton) {
+                // Pass a simulated event object to the openTab function for initial load
+                openTab({ currentTarget: activeTabButton }, 'delays');
+            }
+        });
+    </script>
+</body>
+</html>
