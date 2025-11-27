@@ -131,13 +131,11 @@
         }
 
         .chart-container {
-            margin-bottom: 20px;
             padding: 10px;
             background-color: #fcfcfc;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            height: 350px;
-            max-height: 50vh;
+            height: 100%;
         }
 
         .chart-container h2 {
@@ -194,16 +192,9 @@
         <div class="data-container">
             <div class="controls">
                 <h1>San Francisco GTFS Delay Explorer</h1>
-                <p>
-                    1) Click anywhere on the map to find nearby stops and routes.<br>
-                    2) Click a route to focus it.<br>
-                    3) Click a stop on that route to see delay patterns (both directions).
-                </p>
+                
 
-                <div class="nearest-stops-label">
-                    Nearest stops to use from click:
-                    <input id="nearest-count" type="number" min="1" max="15" value="5" class="nearest-stops-input">
-                </div>
+                
 
                 <button id="clear-route-btn">Clear Route Selection</button>
 
@@ -222,35 +213,42 @@
             </div>
 
             <div id="delays" class="tab-content active">
-                <p id="chart-message" style="flex-shrink:0; font-size:0.9em; color:#7f8c8d;">
-                    Select a route and then a stop to see hourly and daily delay patterns (direction 0 & 1).
-                </p>
+                
 
-                <div id="chart-area" style="display:none;">
+                <div id="chart-area" style="display:none; grid-template-columns: 1fr; grid-auto-rows: 220px; gap: 10px;">
                     <div class="chart-container">
-                        <h2>Hourly Delay (Direction 0 &amp; 1)</h2>
-                        <canvas id="hourlyDelayChart"></canvas>
+                        <h2>Hourly Delay</h2>
+                        <canvas id="hourlyDelayChartDir0"></canvas>
                     </div>
 
                     <div class="chart-container">
-                        <h2>Daily Delay (Direction 0 &amp; 1)</h2>
-                        <canvas id="dailyDelayChart"></canvas>
+                        <h2>Hourly Delay</h2>
+                        <canvas id="hourlyDelayChartDir1"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h2>Daily Delay</h2>
+                        <canvas id="dailyDelayChartDir0"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h2>Daily Delay</h2>
+                        <canvas id="dailyDelayChartDir1"></canvas>
                     </div>
                 </div>
             </div>
 
             <div id="accessibility" class="tab-content">
-                <p>Accessibility information will be displayed here.</p>
+                
             </div>
 
             <div id="reliability" class="tab-content">
-                <p>Reliability metrics will be displayed here.</p>
+                
             </div>
         </div>
     </div>
 
     <script>
-        // ---- Constants / Endpoints ----
         const SF_CENTER = [37.758458, -122.435435];
 
         const BASE_META_URL = "https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/meta/san_francisco";
@@ -261,33 +259,29 @@
         const STOPS_METADATA_URL = `${BASE_META_URL}/stops_metadata.json`;
         const ROUTE_DIR_STOP_DELAY_BASE = `${BASE_META_URL}/route_direction_stop_delay`;
 
-        // ---- State ----
         let map;
         let metaLoaded = false;
 
-        let stopLocations = null;      // {stop_id: [lat, lon]}
-        let routesMetadata = null;     // {route_id: {name, color, link}}
-        let stopsMetadata = null;      // {stop_id: {name, link}}
+        let stopLocations = null;
+        let routesMetadata = null;
+        let stopsMetadata = null;
 
-        let stopRouteMappingCache = {}; // stop_id -> [route_id, ...]
-        let routeStopMappingCache = {}; // route_id -> [[stop_id, ...], ...]
-        let delayDataCache = {};        // key "routeId_dir_stopId" -> [{t, delay}, ...]
+        let stopRouteMappingCache = {};
+        let routeStopMappingCache = {};
+        let delayDataCache = {};
 
         let routesLayerGroup;
         let stopsLayerGroup;
         let selectedRouteId = null;
 
-        // stop_id -> { marker: L.circleMarker, routes: Set(route_ids) }
         let stopMarkerIndex = {};
-
-        // route_id -> [L.Polyline,...]
         let routeLayerIndex = {};
 
-        // Charts
-        let hourlyDelayChart = null;
-        let dailyDelayChart = null;
+        let hourlyDelayChartDir0 = null;
+        let hourlyDelayChartDir1 = null;
+        let dailyDelayChartDir0 = null;
+        let dailyDelayChartDir1 = null;
 
-        // ---- Utility: Tabs ----
         function openTab(evt, tabName) {
             const tabcontent = document.getElementsByClassName("tab-content");
             for (let i = 0; i < tabcontent.length; i++) {
@@ -310,13 +304,7 @@
             }
         }
 
-        // ---- Utility helpers ----
-        function getNearestCount() {
-            const input = document.getElementById("nearest-count");
-            let k = parseInt(input.value, 10);
-            if (isNaN(k) || k <= 0) k = 5;
-            return Math.min(Math.max(k, 1), 50);
-        }
+        function getNearestCount() { return 5; }
 
         function euclideanDistance(lat1, lon1, lat2, lon2) {
             const dLat = lat1 - lat2;
@@ -338,11 +326,10 @@
         }
 
         function groupByHour(samples) {
-            // samples: [{t, delay}]
             const buckets = Array.from({ length: 24 }, () => []);
             samples.forEach(s => {
                 const d = new Date(s.t * 1000);
-                const hour = d.getHours(); // local hours
+                const hour = d.getHours();
                 buckets[hour].push(s.delay);
             });
             return buckets;
@@ -359,7 +346,6 @@
             return groups;
         }
 
-        // ---- Metadata loading ----
         async function loadMetadata() {
             const overlay = document.getElementById("map-overlay");
             try {
@@ -388,7 +374,6 @@
             }
         }
 
-        // ---- Map setup ----
         function initMap() {
             map = L.map('map').setView(SF_CENTER, 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -401,8 +386,9 @@
             map.on('click', onMapClick);
         }
 
-        // ---- Map click: find nearest stops & draw routes ----
         async function onMapClick(e) {
+            // Disable map clicks when route selected
+            if (selectedRouteId) return;
             if (!metaLoaded) {
                 alert("Metadata not loaded yet. Please wait a moment and try again.");
                 return;
@@ -456,8 +442,50 @@
             return Array.from(routeSet);
         }
 
+        function normalizeRouteSequences(raw, routeId) {
+            // Recursively extract sequences of stop_ids from any nested structure.
+            function collectSequences(node) {
+                if (!node) return [];
+
+                // If node is an array
+                if (Array.isArray(node)) {
+                    if (node.length === 0) return [];
+
+                    const allScalars = node.every(v => typeof v === "string" || typeof v === "number");
+                    if (allScalars) {
+                        // This is a single sequence: list of stop_ids
+                        return [node.map(String)];
+                    }
+
+                    // Mixed content: recursively collect from children
+                    let out = [];
+                    node.forEach(child => {
+                        out = out.concat(collectSequences(child));
+                    });
+                    return out;
+                }
+
+                // If node is an object, collect from its values
+                if (typeof node === "object") {
+                    let out = [];
+                    Object.values(node).forEach(child => {
+                        out = out.concat(collectSequences(child));
+                    });
+                    return out;
+                }
+
+                // Anything else: ignore
+                return [];
+            }
+
+            const seqs = collectSequences(raw);
+            if (seqs.length === 0) {
+                console.warn("normalizeRouteSequences(): no sequences for route", routeId, raw);
+            }
+            return seqs;
+        }
+
         async function drawRoutesAndStops(nearestStops, routeIds) {
-            // Clear old layers & indices
             routesLayerGroup.clearLayers();
             stopsLayerGroup.clearLayers();
             routeLayerIndex = {};
@@ -467,34 +495,34 @@
             updateSelectedStopInfo(null);
             clearCharts();
 
-            // For each route, get stop sequences
             await Promise.all(routeIds.map(async (rid) => {
                 if (!routeStopMappingCache[rid]) {
                     const url = `${ROUTE_STOP_MAPPING_BASE}/${rid}.json`;
                     const res = await fetch(url);
-                    if (!res.ok) {
-                        console.warn(`No route_stop_mapping for route ${rid}`);
-                        routeStopMappingCache[rid] = [];
-                    } else {
-                        routeStopMappingCache[rid] = await res.json();
-                    }
+                    routeStopMappingCache[rid] = res.ok ? await res.json() : null;
                 }
             }));
 
-            // Aggregate stops & build polylines
             const bounds = [];
+
             routeIds.forEach(routeId => {
-                const sequences = routeStopMappingCache[routeId] || [];
+                const raw = routeStopMappingCache[routeId];
+                const sequences = normalizeRouteSequences(raw, routeId);
                 const routeMeta = routesMetadata[routeId] || {};
-                const color = routeMeta.color || "#2980b9";
+                const color = routeMeta.color ? `#${routeMeta.color}` : "#2980b9";
+
+                console.log("Route", routeId, "sequences lens:", sequences.map(seq => Array.isArray(seq) ? seq.length : null));
 
                 routeLayerIndex[routeId] = [];
 
                 sequences.forEach(seq => {
+                    if (!Array.isArray(seq)) return;
                     const latlngs = [];
+
                     seq.forEach(stopId => {
                         const loc = stopLocations[stopId];
                         if (!loc) return;
+
                         const [lat, lon] = loc;
                         latlngs.push([lat, lon]);
                         bounds.push([lat, lon]);
@@ -506,10 +534,10 @@
                                 : "";
 
                             const marker = L.circleMarker([lat, lon], {
-                                radius: 6,
-                                color: '#34495e',
-                                fillColor: '#3498db',
-                                fillOpacity: 0.9
+                            radius: 10,
+                            color: '#34495e',
+                            fillColor: '#3498db',
+                            fillOpacity: 0.9
                             })
                                 .bindPopup(
                                     `<b>${stopMeta.name || 'Stop ' + stopId}</b><br>` +
@@ -528,12 +556,12 @@
                     });
 
                     if (latlngs.length >= 2) {
-                        const polyline = L.polyline(latlngs, {
-                            color: color,
-                            weight: 4,
+                        const polyline = L.polyline(latlngs, { zIndexOffset: 0,
+                            color,
+                            weight: 3,
                             opacity: 0.85
                         }).on('click', (e) => {
-                            L.DomEvent.stopPropagation(e); // don't trigger map click
+                            L.DomEvent.stopPropagation(e);
                             onRouteClick(routeId);
                         });
 
@@ -548,12 +576,22 @@
                 });
             });
 
-            if (bounds.length > 0) {
-                map.fitBounds(bounds, { padding: [40, 40] });
-            }
+            if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+
+            // Ensure stop markers are above route lines
+            Object.values(stopMarkerIndex).forEach(entry => {
+                if (entry && entry.marker && entry.marker.bringToFront) {
+                    entry.marker.bringToFront();
+                }
+            });
+
+            // Force stops layer to render above routes layer
+            map.removeLayer(routesLayerGroup);
+            map.removeLayer(stopsLayerGroup);
+            routesLayerGroup.addTo(map);
+            stopsLayerGroup.addTo(map);
         }
 
-        // ---- Route / Stop selection ----
         function updateSelectedRouteInfo(routeId) {
             const el = document.getElementById("selected-route-info");
             if (!routeId) {
@@ -589,10 +627,9 @@
         }
 
         function styleRoutesAndStopsForSelection() {
-            // Routes
             Object.keys(routeLayerIndex).forEach(rid => {
                 const meta = routesMetadata[rid] || {};
-                const baseColor = meta.color || "#2980b9";
+                const baseColor = meta.color ? `#${meta.color}` : "#2980b9";
                 const isSelected = selectedRouteId && rid === selectedRouteId;
 
                 routeLayerIndex[rid].forEach(line => {
@@ -601,20 +638,20 @@
                         opacity: isSelected ? 0.9 : 0.2,
                         weight: isSelected ? 5 : 3
                     });
-                    if (isSelected) line.bringToFront();
                 });
             });
 
-            // Stops
+            // Always keep stops above lines
             Object.keys(stopMarkerIndex).forEach(sid => {
                 const entry = stopMarkerIndex[sid];
                 const isOnSelected = !selectedRouteId || entry.routes.has(selectedRouteId);
                 entry.marker.setStyle({
-                    radius: isOnSelected ? 6 : 4,
+                    radius: isOnSelected ? 10 : 8,
                     fillOpacity: isOnSelected ? 0.9 : 0.25,
                     color: isOnSelected ? '#34495e' : '#bdc3c7',
                     fillColor: isOnSelected ? '#3498db' : '#ecf0f1'
                 });
+                if (entry.marker.bringToFront) entry.marker.bringToFront();
             });
         }
 
@@ -624,8 +661,8 @@
             styleRoutesAndStopsForSelection();
             clearCharts();
             updateSelectedStopInfo(null);
-            document.getElementById("chart-message").style.display = "block";
-            document.getElementById("chart-area").style.display = "none";
+            const chartArea = document.getElementById("chart-area");
+            if (chartArea) chartArea.style.display = "none";
         }
 
         async function onStopClick(stopId) {
@@ -645,8 +682,8 @@
                     return;
                 }
 
-                document.getElementById("chart-message").style.display = "none";
-                document.getElementById("chart-area").style.display = "block";
+                const chartArea = document.getElementById("chart-area");
+                if (chartArea) chartArea.style.display = "grid";
 
                 renderCharts(samplesDir0, samplesDir1);
             } catch (err) {
@@ -655,7 +692,6 @@
             }
         }
 
-        // ---- Delay fetching & processing ----
         async function getDelaySamples(routeId, directionId, stopId) {
             const key = `${routeId}_${directionId}_${stopId}`;
             if (delayDataCache[key]) return delayDataCache[key];
@@ -668,30 +704,36 @@
                 return [];
             }
             const raw = await res.json();
-            // raw format: [[unix_time, delay_sec], ...]
             const samples = raw.map(([t, d]) => ({
                 t,
-                delay: -d  // invert polarity as requested
+                delay: -d
             }));
             delayDataCache[key] = samples;
             return samples;
         }
 
         function clearCharts() {
-            if (hourlyDelayChart) {
-                hourlyDelayChart.destroy();
-                hourlyDelayChart = null;
+            if (hourlyDelayChartDir0) {
+                hourlyDelayChartDir0.destroy();
+                hourlyDelayChartDir0 = null;
             }
-            if (dailyDelayChart) {
-                dailyDelayChart.destroy();
-                dailyDelayChart = null;
+            if (hourlyDelayChartDir1) {
+                hourlyDelayChartDir1.destroy();
+                hourlyDelayChartDir1 = null;
+            }
+            if (dailyDelayChartDir0) {
+                dailyDelayChartDir0.destroy();
+                dailyDelayChartDir0 = null;
+            }
+            if (dailyDelayChartDir1) {
+                dailyDelayChartDir1.destroy();
+                dailyDelayChartDir1 = null;
             }
         }
 
         function renderCharts(samplesDir0, samplesDir1) {
             clearCharts();
 
-            // Hourly groups
             const hourlyBuckets0 = groupByHour(samplesDir0);
             const hourlyBuckets1 = groupByHour(samplesDir1);
 
@@ -710,7 +752,6 @@
                 hourlyStd1.push(stats1.std);
             }
 
-            // Daily groups
             const dailyGroups0 = groupByDate(samplesDir0);
             const dailyGroups1 = groupByDate(samplesDir1);
 
@@ -734,65 +775,72 @@
                 dailyStd1.push(stats1.std);
             });
 
-            renderHourlyChart(hourLabels, hourlyMean0, hourlyStd0, hourlyMean1, hourlyStd1);
-            renderDailyChart(dateLabels, dailyMean0, dailyStd0, dailyMean1, dailyStd1);
+            // Render four separate charts: one per direction per time scale
+            hourlyDelayChartDir0 = renderLineChartWithBand(
+                "hourlyDelayChartDir0",
+                hourLabels,
+                hourlyMean0,
+                hourlyStd0,
+                "Mean delay"
+            );
+            hourlyDelayChartDir1 = renderLineChartWithBand(
+                "hourlyDelayChartDir1",
+                hourLabels,
+                hourlyMean1,
+                hourlyStd1,
+                "Mean delay"
+            );
+
+            dailyDelayChartDir0 = renderLineChartWithBand(
+                "dailyDelayChartDir0",
+                dateLabels,
+                dailyMean0,
+                dailyStd0,
+                "Mean delay"
+            );
+            dailyDelayChartDir1 = renderLineChartWithBand(
+                "dailyDelayChartDir1",
+                dateLabels,
+                dailyMean1,
+                dailyStd1,
+                "Mean delay"
+            );
         }
 
-        function renderHourlyChart(labels, mean0, std0, mean1, std1) {
-            const ctx = document.getElementById("hourlyDelayChart").getContext("2d");
+        function renderLineChartWithBand(canvasId, labels, mean, std, labelMean) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return null;
+            const ctx = canvas.getContext("2d");
 
-            const upper0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m + std0[i] : null);
-            const lower0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m - std0[i] : null);
-            const upper1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m + std1[i] : null);
-            const lower1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m - std1[i] : null);
+            const upper = mean.map((m, i) => (m != null && std[i] != null) ? m + std[i] : null);
+            const lower = mean.map((m, i) => (m != null && std[i] != null) ? m - std[i] : null);
 
-            hourlyDelayChart = new Chart(ctx, {
+            return new Chart(ctx, {
                 type: "line",
                 data: {
                     labels,
                     datasets: [
-                        // Direction 0 band
                         {
-                            label: "Dir 0 Mean",
-                            data: mean0,
+                            label: labelMean,
+                            data: mean,
                             borderWidth: 2,
                             fill: false,
                             tension: 0.25
                         },
                         {
-                            label: "Dir 0 Upper",
-                            data: upper0,
+                            label: "Upper band",
+                            data: upper,
                             borderWidth: 0,
                             fill: "origin",
+                            pointRadius: 0,
                             tension: 0.25
                         },
                         {
-                            label: "Dir 0 Lower",
-                            data: lower0,
+                            label: "Lower band",
+                            data: lower,
                             borderWidth: 0,
                             fill: "-1",
-                            tension: 0.25
-                        },
-                        // Direction 1 band
-                        {
-                            label: "Dir 1 Mean",
-                            data: mean1,
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.25
-                        },
-                        {
-                            label: "Dir 1 Upper",
-                            data: upper1,
-                            borderWidth: 0,
-                            fill: "origin",
-                            tension: 0.25
-                        },
-                        {
-                            label: "Dir 1 Lower",
-                            data: lower1,
-                            borderWidth: 0,
-                            fill: "-1",
+                            pointRadius: 0,
                             tension: 0.25
                         }
                     ]
@@ -803,109 +851,24 @@
                     plugins: {
                         legend: {
                             labels: {
-                                filter: (item) => {
-                                    // show only mean labels in legend
-                                    return item.datasetIndex === 0 || item.datasetIndex === 3;
-                                }
+                                filter: (item) => item.datasetIndex === 0
                             }
                         }
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: "Hour of day" }
+                            title: { display: true, text: labels.length && labels[0].includes(":" ) ? "Hour of day" : "Date" }
                         },
                         y: {
-                            title: { display: true, text: "Delay (sec, polarity flipped)" }
+                            title: { display: true, text: "Delay (sec)" }
                         }
                     }
                 }
             });
         }
 
-        function renderDailyChart(labels, mean0, std0, mean1, std1) {
-            const ctx = document.getElementById("dailyDelayChart").getContext("2d");
+        // (old renderDailyChart removed; handled by renderLineChartWithBand)
 
-            const upper0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m + std0[i] : null);
-            const lower0 = mean0.map((m, i) => (m != null && std0[i] != null) ? m - std0[i] : null);
-            const upper1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m + std1[i] : null);
-            const lower1 = mean1.map((m, i) => (m != null && std1[i] != null) ? m - std1[i] : null);
-
-            dailyDelayChart = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels,
-                    datasets: [
-                        // Dir 0
-                        {
-                            label: "Dir 0 Mean",
-                            data: mean0,
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.25
-                        },
-                        {
-                            label: "Dir 0 Upper",
-                            data: upper0,
-                            borderWidth: 0,
-                            fill: "origin",
-                            tension: 0.25
-                        },
-                        {
-                            label: "Dir 0 Lower",
-                            data: lower0,
-                            borderWidth: 0,
-                            fill: "-1",
-                            tension: 0.25
-                        },
-                        // Dir 1
-                        {
-                            label: "Dir 1 Mean",
-                            data: mean1,
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.25
-                        },
-                        {
-                            label: "Dir 1 Upper",
-                            data: upper1,
-                            borderWidth: 0,
-                            fill: "origin",
-                            tension: 0.25
-                        },
-                        {
-                            label: "Dir 1 Lower",
-                            data: lower1,
-                            borderWidth: 0,
-                            fill: "-1",
-                            tension: 0.25
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                filter: (item) => {
-                                    return item.datasetIndex === 0 || item.datasetIndex === 3;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: { display: true, text: "Date" }
-                        },
-                        y: {
-                            title: { display: true, text: "Delay (sec, polarity flipped)" }
-                        }
-                    }
-                }
-            });
-        }
-
-        // ---- Init ----
         document.addEventListener("DOMContentLoaded", () => {
             initMap();
             loadMetadata();
@@ -913,7 +876,6 @@
             const clearBtn = document.getElementById("clear-route-btn");
             clearBtn.addEventListener("click", clearRouteSelection);
 
-            // activate Delays tab properly on load
             const activeTabButton = document.querySelector(".tabs .tab-button.active");
             if (activeTabButton) {
                 openTab({ currentTarget: activeTabButton }, "delays");
