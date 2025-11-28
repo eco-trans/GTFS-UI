@@ -314,17 +314,24 @@
 
         function computeMeanStd(values) {
             if (!values || values.length === 0) return { mean: null, std: null };
-            const n = values.length;
-            const sum = values.reduce((a, b) => a + b, 0);
-            const mean = sum / n;
-            const varSum = values.reduce((acc, v) => {
-                const diff = v - mean;
-                return acc + diff * diff;
-            }, 0);
-            const std = Math.sqrt(varSum / n);
-            return { mean, std };
-        }
 
+            // Median
+            const sorted = [...values].sort((a, b) => a - b);
+            const n = sorted.length;
+            const mid = Math.floor(n / 2);
+            const median = (n % 2 === 0) ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+
+            // MAD (Median Absolute Deviation)
+            const absDevs = sorted.map(v => Math.abs(v - median));
+            const sortedAbs = absDevs.sort((a, b) => a - b);
+            const midAbs = Math.floor(n / 2);
+            const mad = (n % 2 === 0) ? (sortedAbs[midAbs - 1] + sortedAbs[midAbs]) / 2 : sortedAbs[midAbs];
+
+            // Scale MAD → robust std estimate
+            const madScaled = mad * 1.4826;
+
+            return { mean: median, std: madScaled };
+        }
         function groupByHour(samples) {
             const buckets = Array.from({ length: 24 }, () => []);
             samples.forEach(s => {
@@ -485,6 +492,37 @@
             return seqs;
         }
 
+        function ensureStopMarker(stopId, loc, nearestStops, routeId) {
+            const [lat, lon] = loc;
+            if (!stopMarkerIndex[stopId]) {
+                const stopMeta = stopsMetadata[stopId] || {};
+                const nearestTag = nearestStops.some(ns => ns.stop_id === stopId)
+                    ? "<br><b>Near click</b>" : "";
+
+                const marker = L.circleMarker([lat, lon], {
+                    // SMALL before route is selected
+                    radius: 6,
+                    color: '#34495e',
+                    fillColor: '#3498db',
+                    fillOpacity: 0.9
+                })
+                    .bindPopup(
+                        `<b>${stopMeta.name || 'Stop ' + stopId}</b><br>` +
+                        `Stop ID: ${stopId}${nearestTag}` +
+                        (stopMeta.link ? `<br><a href="${stopMeta.link}" target="_blank">Info</a>` : "")
+                    )
+                    .on('click', () => onStopClick(stopId));
+
+                stopsLayerGroup.addLayer(marker);
+                stopMarkerIndex[stopId] = {
+                    marker,
+                    routes: new Set([routeId])
+                };
+            } else {
+                stopMarkerIndex[stopId].routes.add(routeId);
+            }
+        }
+
         async function drawRoutesAndStops(nearestStops, routeIds) {
             routesLayerGroup.clearLayers();
             stopsLayerGroup.clearLayers();
@@ -495,88 +533,75 @@
             updateSelectedStopInfo(null);
             clearCharts();
 
+            // Load route edges for all routes
             await Promise.all(routeIds.map(async (rid) => {
                 if (!routeStopMappingCache[rid]) {
-                    const url = `${ROUTE_STOP_MAPPING_BASE}/${rid}.json`;
+                    const url = `${BASE_META_URL}/route_edges/${rid}.json`;
                     const res = await fetch(url);
-                    routeStopMappingCache[rid] = res.ok ? await res.json() : null;
+                    if (!res.ok) {
+                        console.warn(`No route_edges for route ${rid}`);
+                        routeStopMappingCache[rid] = [];
+                    } else {
+                        routeStopMappingCache[rid] = await res.json();
+                    }
                 }
             }));
 
             const bounds = [];
 
             routeIds.forEach(routeId => {
-                const raw = routeStopMappingCache[routeId];
-                const sequences = normalizeRouteSequences(raw, routeId);
+                const edges = routeStopMappingCache[routeId] || [];
                 const routeMeta = routesMetadata[routeId] || {};
                 const color = routeMeta.color ? `#${routeMeta.color}` : "#2980b9";
 
-                console.log("Route", routeId, "sequences lens:", sequences.map(seq => Array.isArray(seq) ? seq.length : null));
-
                 routeLayerIndex[routeId] = [];
 
-                sequences.forEach(seq => {
-                    if (!Array.isArray(seq)) return;
-                    const latlngs = [];
+                // Precompute reverse edges for quick lookup
+                const edgeSet = new Set(edges.map(([a, b]) => `${a}_${b}`));
 
-                    seq.forEach(stopId => {
-                        const loc = stopLocations[stopId];
-                        if (!loc) return;
+                edges.forEach(([stopA, stopB]) => {
+                    const locA = stopLocations[stopA];
+                    const locB = stopLocations[stopB];
+                    if (!locA || !locB) return;
 
-                        const [lat, lon] = loc;
-                        latlngs.push([lat, lon]);
-                        bounds.push([lat, lon]);
+                    bounds.push([locA[0], locA[1]]);
+                    bounds.push([locB[0], locB[1]]);
 
-                        if (!stopMarkerIndex[stopId]) {
-                            const stopMeta = stopsMetadata[stopId] || {};
-                            const nearestTag = nearestStops.some(ns => ns.stop_id === stopId)
-                                ? "<br><b>Near click</b>"
-                                : "";
+                    // ensure stop markers
+                    ensureStopMarker(stopA, locA, nearestStops, routeId);
+                    ensureStopMarker(stopB, locB, nearestStops, routeId);
 
-                            const marker = L.circleMarker([lat, lon], {
-                            radius: 10,
-                            color: '#34495e',
-                            fillColor: '#3498db',
-                            fillOpacity: 0.9
-                            })
-                                .bindPopup(
-                                    `<b>${stopMeta.name || 'Stop ' + stopId}</b><br>` +
-                                    `Stop ID: ${stopId}${nearestTag}` +
-                                    (stopMeta.link ? `<br><a href="${stopMeta.link}" target="_blank">Info</a>` : "")
-                                )
-                                .on('click', () => onStopClick(stopId));
+                    const hasReverse = edgeSet.has(`${stopB}_${stopA}`);
 
-                            stopsLayerGroup.addLayer(marker);
-                            stopMarkerIndex[stopId] = {
-                                marker,
-                                routes: new Set()
-                            };
+                    const line = L.polyline(
+                        [
+                            [locA[0], locA[1]],
+                            [locB[0], locB[1]]
+                        ],
+                        {
+                            color,
+                            weight: hasReverse ? 6 : 3,
+                            opacity: hasReverse ? 1.0 : 0.85
                         }
-                        stopMarkerIndex[stopId].routes.add(routeId);
+                    ).on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        onRouteClick(routeId);
                     });
 
-                    if (latlngs.length >= 2) {
-                        const polyline = L.polyline(latlngs, { zIndexOffset: 0,
-                            color,
-                            weight: 3,
-                            opacity: 0.85
-                        }).on('click', (e) => {
-                            L.DomEvent.stopPropagation(e);
-                            onRouteClick(routeId);
-                        });
-
-                        polyline.bindTooltip(
-                            `${routeMeta.name || 'Route ' + routeId}`,
-                            { sticky: true }
-                        );
-
-                        routesLayerGroup.addLayer(polyline);
-                        routeLayerIndex[routeId].push(polyline);
+                    if (hasReverse) {
+                        line.bindTooltip("Two-way connection", { sticky: true });
+                    } else {
+                        line.bindTooltip(`${routeMeta.name || 'Route ' + routeId}`, { sticky: true });
                     }
+
+                    routesLayerGroup.addLayer(line);
+                    routeLayerIndex[routeId].push(line);
                 });
             });
 
-            if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40] });
+            }
 
             // Ensure stop markers are above route lines
             Object.values(stopMarkerIndex).forEach(entry => {
@@ -645,25 +670,67 @@
             Object.keys(stopMarkerIndex).forEach(sid => {
                 const entry = stopMarkerIndex[sid];
                 const isOnSelected = !selectedRouteId || entry.routes.has(selectedRouteId);
+                // Determine color based on delay (use latest known delay)
+                const key0 = `${selectedRouteId}_0_${sid}`;
+                const key1 = `${selectedRouteId}_1_${sid}`;
+                let latestDelay = null;
+                if (delayDataCache[key0] && delayDataCache[key0].length > 0) {
+                    latestDelay = delayDataCache[key0][delayDataCache[key0].length - 1].delay;
+                }
+                if (delayDataCache[key1] && delayDataCache[key1].length > 0) {
+                    latestDelay = delayDataCache[key1][delayDataCache[key1].length - 1].delay;
+                }
+
+                let fillColor = isOnSelected ? '#3498db' : '#ecf0f1';
+                if (latestDelay != null) {
+                    fillColor = latestDelay < 0 ? '#e74c3c' : '#3498db';
+                }
+
                 entry.marker.setStyle({
-                    radius: isOnSelected ? 10 : 8,
+                    radius: isOnSelected ? 10 : 6,
                     fillOpacity: isOnSelected ? 0.9 : 0.25,
                     color: isOnSelected ? '#34495e' : '#bdc3c7',
-                    fillColor: isOnSelected ? '#3498db' : '#ecf0f1'
+                    fillColor: fillColor
                 });
                 if (entry.marker.bringToFront) entry.marker.bringToFront();
             });
         }
 
         function clearRouteSelection() {
-            selectedRouteId = null;
-            updateSelectedRouteInfo(null);
-            styleRoutesAndStopsForSelection();
-            clearCharts();
-            updateSelectedStopInfo(null);
-            const chartArea = document.getElementById("chart-area");
-            if (chartArea) chartArea.style.display = "none";
+    const chartArea = document.getElementById("chart-area");
+    selectedRouteId = null;
+    updateSelectedRouteInfo(null);
+    updateSelectedStopInfo(null);
+    clearCharts();
+    if (chartArea) chartArea.style.display = "none";
+
+    // Reset all stop markers to initial small size
+    Object.values(stopMarkerIndex).forEach(entry => {
+        if (entry && entry.marker) {
+            entry.marker.setStyle({
+                radius: 6,
+                fillOpacity: 0.9,
+                color: '#34495e',
+                fillColor: '#3498db'
+            });
+            if (entry.marker.bringToFront) entry.marker.bringToFront();
         }
+    });
+
+    // Reset all route lines to normal visibility
+    Object.keys(routeLayerIndex).forEach(rid => {
+        const meta = routesMetadata[rid] || {};
+        const baseColor = meta.color ? `#${meta.color}` : "#2980b9";
+        routeLayerIndex[rid].forEach(line => {
+            line.setStyle({
+                color: baseColor,
+                opacity: 0.85,
+                weight: 3
+            });
+        });
+    });
+}
+
 
         async function onStopClick(stopId) {
             if (!selectedRouteId) {
@@ -734,86 +801,81 @@
         function renderCharts(samplesDir0, samplesDir1) {
             clearCharts();
 
-            const hourlyBuckets0 = groupByHour(samplesDir0);
-            const hourlyBuckets1 = groupByHour(samplesDir1);
+            const chartArea = document.getElementById("chart-area");
+            if (!chartArea) return;
 
-            const hourLabels = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, "0") + ":00");
-            const hourlyMean0 = [];
-            const hourlyStd0 = [];
-            const hourlyMean1 = [];
-            const hourlyStd1 = [];
+            // Get chart containers
+            const hourly0Container = document.getElementById("hourlyDelayChartDir0").parentElement;
+            const hourly1Container = document.getElementById("hourlyDelayChartDir1").parentElement;
+            const daily0Container = document.getElementById("dailyDelayChartDir0").parentElement;
+            const daily1Container = document.getElementById("dailyDelayChartDir1").parentElement;
 
-            for (let h = 0; h < 24; h++) {
-                const stats0 = computeMeanStd(hourlyBuckets0[h]);
-                const stats1 = computeMeanStd(hourlyBuckets1[h]);
-                hourlyMean0.push(stats0.mean);
-                hourlyStd0.push(stats0.std);
-                hourlyMean1.push(stats1.mean);
-                hourlyStd1.push(stats1.std);
+            // Hide all first
+            hourly0Container.style.display = "none";
+            hourly1Container.style.display = "none";
+            daily0Container.style.display = "none";
+            daily1Container.style.display = "none";
+
+            // DIR 0
+            if (samplesDir0.length > 0) {
+                const hourlyBuckets0 = groupByHour(samplesDir0);
+                const hourLabels = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, "0") + ":00");
+                const hourlyMean0 = []; const hourlyStd0 = [];
+                for (let h = 0; h < 24; h++) {
+                    const stats = computeMeanStd(hourlyBuckets0[h]);
+                    hourlyMean0.push(stats.mean);
+                    hourlyStd0.push(stats.std);
+                }
+                hourlyDelayChartDir0 = renderLineChartWithBand("hourlyDelayChartDir0", hourLabels, hourlyMean0, hourlyStd0, "Median delay");
+                hourly0Container.style.display = "block";
+
+                const dailyGroups0 = groupByDate(samplesDir0);
+                const dateLabels0 = Object.keys(dailyGroups0).sort();
+                const dailyMean0 = [], dailyStd0 = [];
+                dateLabels0.forEach(d => {
+                    const stats = computeMeanStd(dailyGroups0[d]);
+                    dailyMean0.push(stats.mean);
+                    dailyStd0.push(stats.std);
+                });
+                dailyDelayChartDir0 = renderLineChartWithBand("dailyDelayChartDir0", dateLabels0, dailyMean0, dailyStd0, "Median delay");
+                daily0Container.style.display = "block";
             }
 
-            const dailyGroups0 = groupByDate(samplesDir0);
-            const dailyGroups1 = groupByDate(samplesDir1);
+            // DIR 1
+            if (samplesDir1.length > 0) {
+                const hourlyBuckets1 = groupByHour(samplesDir1);
+                const hourLabels = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, "0") + ":00");
+                const hourlyMean1 = []; const hourlyStd1 = [];
+                for (let h = 0; h < 24; h++) {
+                    const stats = computeMeanStd(hourlyBuckets1[h]);
+                    hourlyMean1.push(stats.mean);
+                    hourlyStd1.push(stats.std);
+                }
+                hourlyDelayChartDir1 = renderLineChartWithBand("hourlyDelayChartDir1", hourLabels, hourlyMean1, hourlyStd1, "Median delay");
+                hourly1Container.style.display = "block";
 
-            const allDatesSet = new Set([
-                ...Object.keys(dailyGroups0),
-                ...Object.keys(dailyGroups1)
-            ]);
-            const dateLabels = Array.from(allDatesSet).sort();
-
-            const dailyMean0 = [];
-            const dailyStd0 = [];
-            const dailyMean1 = [];
-            const dailyStd1 = [];
-
-            dateLabels.forEach(dateStr => {
-                const stats0 = computeMeanStd(dailyGroups0[dateStr] || []);
-                const stats1 = computeMeanStd(dailyGroups1[dateStr] || []);
-                dailyMean0.push(stats0.mean);
-                dailyStd0.push(stats0.std);
-                dailyMean1.push(stats1.mean);
-                dailyStd1.push(stats1.std);
-            });
-
-            // Render four separate charts: one per direction per time scale
-            hourlyDelayChartDir0 = renderLineChartWithBand(
-                "hourlyDelayChartDir0",
-                hourLabels,
-                hourlyMean0,
-                hourlyStd0,
-                "Mean delay"
-            );
-            hourlyDelayChartDir1 = renderLineChartWithBand(
-                "hourlyDelayChartDir1",
-                hourLabels,
-                hourlyMean1,
-                hourlyStd1,
-                "Mean delay"
-            );
-
-            dailyDelayChartDir0 = renderLineChartWithBand(
-                "dailyDelayChartDir0",
-                dateLabels,
-                dailyMean0,
-                dailyStd0,
-                "Mean delay"
-            );
-            dailyDelayChartDir1 = renderLineChartWithBand(
-                "dailyDelayChartDir1",
-                dateLabels,
-                dailyMean1,
-                dailyStd1,
-                "Mean delay"
-            );
+                const dailyGroups1 = groupByDate(samplesDir1);
+                const dateLabels1 = Object.keys(dailyGroups1).sort();
+                const dailyMean1 = [], dailyStd1 = [];
+                dateLabels1.forEach(d => {
+                    const stats = computeMeanStd(dailyGroups1[d]);
+                    dailyMean1.push(stats.mean);
+                    dailyStd1.push(stats.std);
+                });
+                dailyDelayChartDir1 = renderLineChartWithBand("dailyDelayChartDir1", dateLabels1, dailyMean1, dailyStd1, "Median delay");
+                daily1Container.style.display = "block";
+            }
         }
 
-        function renderLineChartWithBand(canvasId, labels, mean, std, labelMean) {
+        // old code removed
+
+        function renderLineChartWithBand(canvasId, labels, medianVals, madVals, label) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return null;
             const ctx = canvas.getContext("2d");
 
-            const upper = mean.map((m, i) => (m != null && std[i] != null) ? m + std[i] : null);
-            const lower = mean.map((m, i) => (m != null && std[i] != null) ? m - std[i] : null);
+            const upper = medianVals.map((m, i) => (m != null && madVals[i] != null) ? m + madVals[i] : null);
+            const lower = medianVals.map((m, i) => (m != null && madVals[i] != null) ? m - madVals[i] : null);
 
             return new Chart(ctx, {
                 type: "line",
@@ -821,14 +883,14 @@
                     labels,
                     datasets: [
                         {
-                            label: labelMean,
-                            data: mean,
+                            label: label,
+                            data: medianVals,
                             borderWidth: 2,
                             fill: false,
                             tension: 0.25
                         },
                         {
-                            label: "Upper band",
+                            label: "Upper bound",
                             data: upper,
                             borderWidth: 0,
                             fill: "origin",
@@ -836,7 +898,7 @@
                             tension: 0.25
                         },
                         {
-                            label: "Lower band",
+                            label: "Lower bound",
                             data: lower,
                             borderWidth: 0,
                             fill: "-1",
@@ -860,7 +922,9 @@
                             title: { display: true, text: labels.length && labels[0].includes(":" ) ? "Hour of day" : "Date" }
                         },
                         y: {
-                            title: { display: true, text: "Delay (sec)" }
+                            title: { display: true, text: "Delay (sec)" },
+                            suggestedMin: Math.min(...medianVals.filter(v => v != null)),
+                            suggestedMax: Math.max(...medianVals.filter(v => v != null))
                         }
                     }
                 }
