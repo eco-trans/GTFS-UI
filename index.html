@@ -215,23 +215,23 @@
             <div id="delays" class="tab-content active">
                 
 
-                <div id="chart-area" style="display:none; grid-template-columns: 1fr; grid-auto-rows: 220px; gap: 10px;">
-                    <div class="chart-container">
+                <div id="chart-area" style="display:none; display:grid; grid-template-columns: 1fr; grid-auto-rows: 420px; gap: 14px;">
+                    <div class="chart-container" style="min-height:400px;">
                         <h2>Hourly Delay</h2>
                         <canvas id="hourlyDelayChartDir0"></canvas>
                     </div>
 
-                    <div class="chart-container">
+                    <div class="chart-container" style="min-height:400px;">
                         <h2>Hourly Delay</h2>
                         <canvas id="hourlyDelayChartDir1"></canvas>
                     </div>
 
-                    <div class="chart-container">
+                    <div class="chart-container" style="min-height:400px;">
                         <h2>Daily Delay</h2>
                         <canvas id="dailyDelayChartDir0"></canvas>
                     </div>
 
-                    <div class="chart-container">
+                    <div class="chart-container" style="min-height:400px;">
                         <h2>Daily Delay</h2>
                         <canvas id="dailyDelayChartDir1"></canvas>
                     </div>
@@ -869,62 +869,98 @@
 
         // old code removed
 
-        function renderLineChartWithBand(canvasId, labels, medianVals, madVals, label) {
+        function renderLineChartWithBand(canvasId, labels, seriesVals, bandVals, label) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return null;
             const ctx = canvas.getContext("2d");
 
-            const upper = medianVals.map((m, i) => (m != null && madVals[i] != null) ? m + madVals[i] : null);
-            const lower = medianVals.map((m, i) => (m != null && madVals[i] != null) ? m - madVals[i] : null);
+            // Build upper/lower curves from median (seriesVals) ± MAD (bandVals)
+            const upper = seriesVals.map((v, i) =>
+                (v != null && bandVals[i] != null) ? v + bandVals[i] : null
+            );
+            const lower = seriesVals.map((v, i) =>
+                (v != null && bandVals[i] != null) ? v - bandVals[i] : null
+            );
+
+            // For y-axis scaling, use only finite median values
+            const validVals = seriesVals.filter(v => v != null && isFinite(v));
+            const yMin = validVals.length ? Math.min(...validVals) : undefined;
+            const yMax = validVals.length ? Math.max(...validVals) : undefined;
 
             return new Chart(ctx, {
                 type: "line",
                 data: {
                     labels,
                     datasets: [
+                        // Main median series
                         {
                             label: label,
-                            data: medianVals,
+                            data: seriesVals,
                             borderWidth: 2,
+                            pointRadius: 3,
                             fill: false,
-                            tension: 0.25
+                            tension: 0.25,
+                            borderColor: "#3498db",
+                            backgroundColor: "#3498db"
                         },
-                        {
-                            label: "Upper bound",
-                            data: upper,
-                            borderWidth: 0,
-                            fill: "origin",
-                            pointRadius: 0,
-                            tension: 0.25
-                        },
+                        // Lower curve (no fill by itself)
                         {
                             label: "Lower bound",
                             data: lower,
                             borderWidth: 0,
-                            fill: "-1",
                             pointRadius: 0,
+                            fill: false,
                             tension: 0.25
+                        },
+                        // Upper curve, filled down to the lower curve → single red band
+                        {
+                            label: "MAD band",
+                            data: upper,
+                            borderWidth: 0,
+                            pointRadius: 0,
+                            fill: "-1", // fill between this and previous dataset (lower)
+                            tension: 0.25,
+                            backgroundColor: "rgba(231, 76, 60, 0.22)"
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: { bottom: 50 }
+                    },
                     plugins: {
                         legend: {
                             labels: {
+                                // Only show main series in legend
                                 filter: (item) => item.datasetIndex === 0
                             }
                         }
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: labels.length && labels[0].includes(":" ) ? "Hour of day" : "Date" }
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: 8,
+                                padding: 20
+                            },
+                            title: {
+                                display: true,
+                                text: labels.length && typeof labels[0] === "string" && labels[0].includes(":")
+                                    ? "Hour of day"
+                                    : "Date"
+                            }
                         },
                         y: {
                             title: { display: true, text: "Delay (sec)" },
-                            suggestedMin: Math.min(...medianVals.filter(v => v != null)),
-                            suggestedMax: Math.max(...medianVals.filter(v => v != null))
+                            ticks: {
+                                padding: 8
+                            },
+                            suggestedMin: yMin,
+                            suggestedMax: yMax
                         }
                     }
                 }
