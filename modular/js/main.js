@@ -36,7 +36,8 @@ window.showRouteListSection = function (show) {
 };
 
 window.showStopListSection = function (show) {
-    // no-op (stop dropdown stays in controls)
+    const section = document.getElementById('stop-select-container');
+    if (section) section.style.display = show ? 'block' : 'none';
 };
 
 window.showChartArea = function (show) {
@@ -59,7 +60,7 @@ window.clearRouteSelection = function () {
     window.stopMarkerIndex = {};
 
     showRouteListSection(false);
-    // stop dropdown reset
+    showStopListSection(false);
     const stopSelect = document.getElementById('stop-select');
     if (stopSelect) {
         stopSelect.disabled = true;

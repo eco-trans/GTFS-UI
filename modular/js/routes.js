@@ -33,6 +33,13 @@ window.populateRouteList = function (routeIds) {
     if (controlsSection) {
         controlsSection.style.display = routeIds.length ? 'block' : 'none';
     }
+    // hide stop dropdown until a route is selected
+    showStopListSection(false);
+    const stopSelect = document.getElementById('stop-select');
+    if (stopSelect) {
+        stopSelect.disabled = true;
+        stopSelect.innerHTML = '<option>Pick a route first</option>';
+    }
 };
 
 window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
@@ -111,6 +118,7 @@ window.onRouteClick = function (routeId) {
 
     styleRoutesAndStopsForSelection();
     populateStopSelect(routeId);
+    showStopListSection(true);
 };
 
 window.styleRoutesAndStopsForSelection = function () {
