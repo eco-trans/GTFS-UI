@@ -115,7 +115,7 @@ window.styleRoutesAndStopsForSelection = function () {
         const meta = window.routesMetadata[rid] || {};
         const baseColor = meta.color ? `#${meta.color}` : '#2980b9';
         const isSelected = window.selectedRouteId === rid;
-        const opacity = isSelected || !window.selectedRouteId ? 0.95 : 0.35;
+        const opacity = isSelected || !window.selectedRouteId ? 0.95 : 0.7;
         const dimColor = '#bdc3c7';
 
         window.routeLayerIndex[rid].forEach((line) => {
@@ -129,9 +129,9 @@ window.styleRoutesAndStopsForSelection = function () {
             arrow.setStyle({
                 color: isSelected || !window.selectedRouteId ? baseColor : dimColor,
                 opacity,
-            weight: isSelected ? 1.4 : 1,
+                weight: isSelected ? 1.6 : 1.2,
+            });
         });
-    });
     });
 
     Object.keys(window.stopMarkerIndex).forEach((sid) => {
@@ -140,8 +140,8 @@ window.styleRoutesAndStopsForSelection = function () {
         const isSelectedStop = window.selectedStopId === sid;
         entry.marker.setStyle({
             radius: isSelectedStop ? 11 : isOnSelected ? 9 : 6,
-            fillOpacity: isSelectedStop ? 0.95 : isOnSelected ? 0.9 : 0.25,
-            color: isOnSelected ? '#34495e' : '#bdc3c7',
+            fillOpacity: isSelectedStop ? 0.95 : isOnSelected ? 0.9 : 0.6,
+            color: isSelectedStop ? '#e74c3c' : isOnSelected ? '#34495e' : '#bdc3c7',
             fillColor: isSelectedStop ? '#e74c3c' : isOnSelected ? '#3498db' : '#ecf0f1',
             weight: isSelectedStop ? 1 : isOnSelected ? 0.6 : 0,
         });
@@ -157,7 +157,7 @@ function createDirectionArrow(start, end, color) {
     if (!segLen) return null;
 
     // Keep arrow size small and proportional to segment length.
-    const arrowLen = Math.min(0.00006, Math.max(0.000012, segLen * 0.16));
+    const arrowLen = Math.min(0.00008, Math.max(0.000015, segLen * 0.18));
     const ux = dLat / segLen;
     const uy = dLng / segLen;
 

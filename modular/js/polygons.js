@@ -56,6 +56,10 @@ window.showPolygonHistogram = function (gid) {
     const bins = hist[1];
     if (!Array.isArray(freqs) || !Array.isArray(bins)) return;
 
+    const pairs = bins.map((b, i) => ({ bin: Number(b), freq: freqs[i] || 0 })).sort((a, b) => a.bin - b.bin);
+    const sortedBins = pairs.map((p) => p.bin);
+    const sortedFreqs = pairs.map((p) => p.freq);
+
     const canvas = document.getElementById('polygonHistogramChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -68,11 +72,11 @@ window.showPolygonHistogram = function (gid) {
     window.polygonHistogramChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: bins.map((v) => v.toFixed(0)),
+            labels: sortedBins.map((v) => v.toFixed(0)),
             datasets: [
                 {
                     label: 'Frequency',
-                    data: freqs,
+                    data: sortedFreqs,
                     backgroundColor: 'rgba(52, 152, 219, 0.55)',
                 },
             ],
@@ -85,11 +89,48 @@ window.showPolygonHistogram = function (gid) {
                 y: { title: { display: true, text: 'Count' } },
             },
         },
+        plugins: [
+            {
+                id: 'zeroLine',
+                afterDraw: (chart) => {
+                    const { ctx } = chart;
+                    const labels = chart.data.labels.map((v) => Number(v));
+                    if (!labels.length) return;
+                    let closestIndex = 0;
+                    let closestVal = Math.abs(labels[0]);
+                    labels.forEach((v, i) => {
+                        const d = Math.abs(v);
+                        if (d < closestVal) {
+                            closestVal = d;
+                            closestIndex = i;
+                        }
+                    });
+                    const xScale = chart.scales.x;
+                    const yScale = chart.scales.y;
+                    if (!xScale || !yScale) return;
+                    const x = xScale.getPixelForValue(closestIndex);
+                    ctx.save();
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = '#555';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, yScale.top);
+                    ctx.lineTo(x, yScale.bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                },
+            },
+        ],
     });
 };
 
 window.onPolygonClick = async function (gid) {
     if (!window.metaLoaded) return;
+    // Ensure polygons layer is on when interacting
+    if (window.polygonsLayer && !window.map.hasLayer(window.polygonsLayer)) {
+        window.polygonsLayer.addTo(window.map);
+        window.polygonsVisible = true;
+    }
     window.selectedPolygonGid = gid;
     window.selectedRouteId = null;
     window.selectedStopId = null;
@@ -101,7 +142,7 @@ window.onPolygonClick = async function (gid) {
     showStopListSection(false);
     showChartArea(false);
 
-    const stopIds = window.polygonStopMapping[gid] || [];
+    const stopIds = window.polygonStopMapping[String(gid)] || [];
     const routeIds = await getRoutesForStops(stopIds);
 
     populateRouteList(routeIds);
