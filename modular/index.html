@@ -1,0 +1,85 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTFS Delay Dashboard (Modular)</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="css/styles.css">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="map-container">
+            <div id="map"></div>
+            <div id="map-overlay" class="map-overlay">Loading metadata...</div>
+        </div>
+
+        <div class="data-container">
+            <div class="controls">
+                <h1>San Francisco Transit Delay</h1>
+                <p>Hover an area to see its delay distribution. Click to drill into routes, then a stop to view hourly and daily delay patterns.</p>
+                <div class="status-line">
+                    <span id="selected-polygon-label" class="status-pill">Area: none</span>
+                    <span id="selected-route-label" class="status-pill">Route: none</span>
+                    <span id="selected-stop-label" class="status-pill">Stop: none</span>
+                </div>
+                <button id="clear-selection" type="button">Clear route selection</button>
+            </div>
+
+            <div class="tab-content">
+                <div id="polygon-stats" class="chart-wrapper">
+                    <div class="chart-container">
+                        <h2>Area Delay Distribution</h2>
+                        <canvas id="polygonHistogramChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="route-list-section" class="list-section" style="display: none;">
+                    <h3>Routes in selected area</h3>
+                    <div id="route-list" class="pill-list"></div>
+                </div>
+
+                <div id="stop-list-section" class="list-section" style="display: none;">
+                    <h3>Stops on selected route</h3>
+                    <div id="stop-list" class="pill-list"></div>
+                </div>
+
+                <div id="chart-area" class="chart-grid" style="display: none;">
+                    <div class="chart-container" id="hourlyDir0Container">
+                        <h2>Hourly delay</h2>
+                        <canvas id="hourlyDelayChartDir0"></canvas>
+                    </div>
+
+                    <div class="chart-container" id="hourlyDir1Container">
+                        <h2>Hourly delay</h2>
+                        <canvas id="hourlyDelayChartDir1"></canvas>
+                    </div>
+
+                    <div class="chart-container" id="dailyDir0Container">
+                        <h2>Daily delay</h2>
+                        <canvas id="dailyDelayChartDir0"></canvas>
+                    </div>
+
+                    <div class="chart-container" id="dailyDir1Container">
+                        <h2>Daily delay</h2>
+                        <canvas id="dailyDelayChartDir1"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script defer src="js/state.js"></script>
+    <script defer src="js/utils.js"></script>
+    <script defer src="js/map.js"></script>
+    <script defer src="js/polygons.js"></script>
+    <script defer src="js/routes.js"></script>
+    <script defer src="js/stops.js"></script>
+    <script defer src="js/charts.js"></script>
+    <script defer src="js/main.js"></script>
+</body>
+</html>

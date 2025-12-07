@@ -1,18 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GTFS Delay Dashboard – San Francisco</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Leaflet -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
@@ -41,6 +49,19 @@
             width: 100%;
         }
 
+        #map-overlay {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: #34495e;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            z-index: 500;
+        }
+
         .data-container {
             flex: 1;
             display: flex;
@@ -53,129 +74,120 @@
         }
 
         .controls {
-            padding: 15px;
+            padding: 14px 16px;
             border-bottom: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             flex-shrink: 0;
         }
 
         .controls h1 {
-            font-size: 1.1em;
+            font-size: 1.05rem;
             font-weight: 700;
             color: #2c3e50;
         }
 
         .controls p {
-            font-size: 0.85em;
+            font-size: 0.82rem;
             color: #7f8c8d;
             line-height: 1.3;
         }
 
+        .status-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            font-size: 0.8rem;
+            color: #2c3e50;
+        }
+
+        .status-pill {
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #ecf0f1;
+        }
+
         .controls button {
-            padding: 8px 10px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            font-size: 0.9em;
             align-self: flex-start;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid #d0d7de;
+            background: #f5f7fa;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
         }
 
         .controls button:hover {
-            background-color: #2980b9;
-        }
-
-        .controls .status-line {
-            font-size: 0.85em;
-            color: #34495e;
-        }
-
-        .status-label {
-            font-weight: 600;
-        }
-
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid #e0e0e0;
-            flex-shrink: 0;
-        }
-
-        .tab-button {
-            padding: 15px 20px;
-            cursor: pointer;
-            font-weight: 600;
-            color: #7f8c8d;
-            transition: color 0.2s, border-bottom 0.2s;
-        }
-
-        .tab-button.active {
-            color: #3498db;
-            border-bottom: 3px solid #3498db;
+            background: #e6f2fb;
+            border-color: #3498db;
         }
 
         .tab-content {
-            padding: 15px;
-            display: none;
+            flex: 1;
+            padding: 10px 14px 12px;
             overflow-y: auto;
-            flex-grow: 1;
-            min-height: 0;
-        }
-
-        .tab-content.active {
-            display: flex;
-            flex-direction: column;
         }
 
         .chart-container {
-            padding: 10px;
-            background-color: #fcfcfc;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            height: 100%;
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 10px 12px 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
         .chart-container h2 {
-            font-size: 1.0em;
-            color: #333;
-            margin-bottom: 8px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 4px;
-        }
-
-        .map-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(255, 255, 255, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            font-size: 1.0em;
-            font-weight: bold;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
             color: #2c3e50;
-            text-align: center;
-            padding: 10px;
         }
 
-        .nearest-stops-label {
-            font-size: 0.8em;
-            color: #7f8c8d;
+        .list-section {
+            margin-top: 8px;
+            font-size: 0.84rem;
         }
 
-        .nearest-stops-input {
-            width: 60px;
-            padding: 4px 6px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            font-size: 0.85em;
-            margin-left: 4px;
+        .list-section h3 {
+            font-size: 0.88rem;
+            margin-bottom: 4px;
+            color: #2c3e50;
+        }
+
+        .pill-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .pill-button {
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid #d0d7de;
+            background-color: #f8fafc;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+        .pill-button:hover {
+            background-color: #e6f2fb;
+            border-color: #3498db;
+        }
+
+        .pill-button.selected {
+            background-color: #3498db;
+            color: #ffffff;
+            border-color: #2980b9;
+        }
+
+        #chart-area {
+            display: none;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-auto-rows: 420px;
+            gap: 14px;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -183,415 +195,505 @@
     <div class="dashboard-container">
         <div class="map-container">
             <div id="map"></div>
-            <div id="map-overlay" class="map-overlay">
-                Loading metadata for San Francisco…<br>
-                Once loaded, click anywhere on the map to explore nearby routes.
-            </div>
+            <div id="map-overlay">Loading metadata…</div>
         </div>
 
         <div class="data-container">
             <div class="controls">
-                <h1>San Francisco GTFS Delay Explorer</h1>
-                
-
-                
-
-                <button id="clear-route-btn">Clear Route Selection</button>
-
-                <div class="status-line" id="selected-route-info">
-                    <span class="status-label">Selected route:</span> None
+                <h1>San Francisco Transit Delay</h1>
+                <p>
+                    Hover a shaded area to see its delay distribution. Click an area
+                    to explore routes, then select a route and stop to view
+                    stop-level delay patterns.
+                </p>
+                <div class="status-line">
+                    <span class="status-pill"
+                        id="selected-route-label">Route: none</span>
+                    <span class="status-pill"
+                        id="selected-stop-label">Stop: none</span>
                 </div>
-                <div class="status-line" id="selected-stop-info">
-                    <span class="status-label">Selected stop:</span> None
-                </div>
+                <button type="button" onclick="clearRouteSelection()">
+                    Clear route selection
+                </button>
             </div>
 
-            <div class="tabs">
-                <div class="tab-button active" onclick="openTab(event, 'delays')">Delays</div>
-                <div class="tab-button" onclick="openTab(event, 'accessibility')">Accessibility</div>
-                <div class="tab-button" onclick="openTab(event, 'reliability')">Reliability</div>
-            </div>
+            <div id="delays" class="tab-content">
+                <!-- Polygon-level stats -->
+                <div
+                    id="polygon-stats"
+                    style="width: 100%; display: block; margin-bottom: 10px"
+                >
+                    <div class="chart-container" style="min-height: 260px">
+                        <h2>Area Delay Distribution</h2>
+                        <canvas id="polygonHistogramChart"></canvas>
+                    </div>
+                </div>
 
-            <div id="delays" class="tab-content active">
-                
+                <!-- Route list (when polygon clicked) -->
+                <div
+                    id="route-list-section"
+                    class="list-section"
+                    style="display: none"
+                >
+                    <h3>Routes in selected area</h3>
+                    <div id="route-list" class="pill-list"></div>
+                </div>
 
-                <div id="chart-area" style="display:none; display:grid; grid-template-columns: 1fr; grid-auto-rows: 420px; gap: 14px;">
-                    <div class="chart-container" style="min-height:400px;">
-                        <h2>Hourly Delay</h2>
+                <!-- Stop list (when route selected) -->
+                <div
+                    id="stop-list-section"
+                    class="list-section"
+                    style="display: none"
+                >
+                    <h3>Stops on selected route</h3>
+                    <div id="stop-list" class="pill-list"></div>
+                </div>
+
+                <!-- Stop-level delay charts -->
+                <div
+                    id="chart-area"
+                    style="
+                        display: none;
+                        grid-template-columns: 1fr;
+                        grid-auto-rows: 420px;
+                        gap: 14px;
+                        margin-top: 12px;
+                    "
+                >
+                    <div class="chart-container" id="hourlyDir0Container">
+                        <h2>Hourly delay</h2>
                         <canvas id="hourlyDelayChartDir0"></canvas>
                     </div>
 
-                    <div class="chart-container" style="min-height:400px;">
-                        <h2>Hourly Delay</h2>
+                    <div class="chart-container" id="hourlyDir1Container">
+                        <h2>Hourly delay</h2>
                         <canvas id="hourlyDelayChartDir1"></canvas>
                     </div>
 
-                    <div class="chart-container" style="min-height:400px;">
-                        <h2>Daily Delay</h2>
+                    <div class="chart-container" id="dailyDir0Container">
+                        <h2>Daily delay</h2>
                         <canvas id="dailyDelayChartDir0"></canvas>
                     </div>
 
-                    <div class="chart-container" style="min-height:400px;">
-                        <h2>Daily Delay</h2>
+                    <div class="chart-container" id="dailyDir1Container">
+                        <h2>Daily delay</h2>
                         <canvas id="dailyDelayChartDir1"></canvas>
                     </div>
                 </div>
-            </div>
-
-            <div id="accessibility" class="tab-content">
-                
-            </div>
-
-            <div id="reliability" class="tab-content">
-                
             </div>
         </div>
     </div>
 
     <script>
+        // --- Constants -------------------------------------------------------
+
         const SF_CENTER = [37.758458, -122.435435];
 
-        const BASE_META_URL = "https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/meta/san_francisco";
+        const BASE_META_URL =
+            "https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/meta/san_francisco";
+
         const STOP_LOCATION_URL = `${BASE_META_URL}/stop_location.json`;
         const STOP_ROUTE_MAPPING_BASE = `${BASE_META_URL}/stop_route_mapping`;
-        const ROUTE_STOP_MAPPING_BASE = `${BASE_META_URL}/route_stop_mapping`;
         const ROUTES_METADATA_URL = `${BASE_META_URL}/routes_metadata.json`;
         const STOPS_METADATA_URL = `${BASE_META_URL}/stops_metadata.json`;
+        const ROUTE_EDGES_BASE = `${BASE_META_URL}/route_edges`;
         const ROUTE_DIR_STOP_DELAY_BASE = `${BASE_META_URL}/route_direction_stop_delay`;
 
+        const POLYGONS_URL = `${BASE_META_URL}/polygons.geojson`;
+        const POLYGON_STOP_MAPPING_URL = `${BASE_META_URL}/polygon_stop_mapping.json`;
+        const SPATIAL_DELAY_URL = `${BASE_META_URL}/spatial_delay_data.json`;
+
+        // --- Global state ----------------------------------------------------
+
         let map;
-        let metaLoaded = false;
-
-        let stopLocations = null;
-        let routesMetadata = null;
-        let stopsMetadata = null;
-
-        let stopRouteMappingCache = {};
-        let routeStopMappingCache = {};
-        let delayDataCache = {};
-
+        let polygonsLayer;
         let routesLayerGroup;
         let stopsLayerGroup;
-        let selectedRouteId = null;
 
-        let stopMarkerIndex = {};
+        let stopLocations = null;
+        let routesMetadata = {};
+        let stopsMetadata = {};
+
+        let polygonsGeoJson = null;
+        let polygonStopMapping = null;
+        let spatialDelayData = null;
+
+        let polygonMeanDelays = {};
+        let polygonMinMean = null;
+        let polygonMaxMean = null;
+
+        let stopRouteMappingCache = {};
+        let routeEdgesCache = {};
         let routeLayerIndex = {};
+        let stopMarkerIndex = {}; // stopId -> { marker, routes: Set }
 
+        let selectedPolygonGid = null;
+        let selectedRouteId = null;
+        let selectedStopId = null;
+
+        let polygonHistogramChart = null;
         let hourlyDelayChartDir0 = null;
         let hourlyDelayChartDir1 = null;
         let dailyDelayChartDir0 = null;
         let dailyDelayChartDir1 = null;
 
-        function openTab(evt, tabName) {
-            const tabcontent = document.getElementsByClassName("tab-content");
-            for (let i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-                tabcontent[i].classList.remove("active");
-            }
+        let metaLoaded = false;
 
-            const tabbuttons = document.getElementsByClassName("tab-button");
-            for (let i = 0; i < tabbuttons.length; i++) {
-                tabbuttons[i].className = tabbuttons[i].className.replace(" active", "");
-            }
+        // --- Init ------------------------------------------------------------
 
-            const targetTab = document.getElementById(tabName);
-            if (targetTab) {
-                targetTab.style.display = "flex";
-                targetTab.classList.add("active");
-            }
-            if (evt && evt.currentTarget) {
-                evt.currentTarget.className += " active";
-            }
-        }
+        document.addEventListener("DOMContentLoaded", () => {
+            initMap();
+            loadMetadata();
+        });
 
-        function getNearestCount() { return 5; }
+        function initMap() {
+            map = L.map("map").setView(SF_CENTER, 13);
 
-        function euclideanDistance(lat1, lon1, lat2, lon2) {
-            const dLat = lat1 - lat2;
-            const dLon = lon1 - lon2;
-            return Math.sqrt(dLat * dLat + dLon * dLon);
-        }
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: "&copy; OpenStreetMap contributors",
+            }).addTo(map);
 
-        function computeMeanStd(values) {
-            if (!values || values.length === 0) return { mean: null, std: null };
-
-            // Median
-            const sorted = [...values].sort((a, b) => a - b);
-            const n = sorted.length;
-            const mid = Math.floor(n / 2);
-            const median = (n % 2 === 0) ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-
-            // MAD (Median Absolute Deviation)
-            const absDevs = sorted.map(v => Math.abs(v - median));
-            const sortedAbs = absDevs.sort((a, b) => a - b);
-            const midAbs = Math.floor(n / 2);
-            const mad = (n % 2 === 0) ? (sortedAbs[midAbs - 1] + sortedAbs[midAbs]) / 2 : sortedAbs[midAbs];
-
-            // Scale MAD → robust std estimate
-            const madScaled = mad * 1.4826;
-
-            return { mean: median, std: madScaled };
-        }
-        function groupByHour(samples) {
-            const buckets = Array.from({ length: 24 }, () => []);
-            samples.forEach(s => {
-                const d = new Date(s.t * 1000);
-                const hour = d.getHours();
-                buckets[hour].push(s.delay);
-            });
-            return buckets;
-        }
-
-        function groupByDate(samples) {
-            const groups = {};
-            samples.forEach(s => {
-                const d = new Date(s.t * 1000);
-                const dateStr = d.toISOString().split("T")[0];
-                if (!groups[dateStr]) groups[dateStr] = [];
-                groups[dateStr].push(s.delay);
-            });
-            return groups;
+            polygonsLayer = L.layerGroup().addTo(map);
+            routesLayerGroup = L.layerGroup().addTo(map);
+            stopsLayerGroup = L.layerGroup().addTo(map);
         }
 
         async function loadMetadata() {
             const overlay = document.getElementById("map-overlay");
             try {
-                const [stopLocRes, routesMetaRes, stopsMetaRes] = await Promise.all([
+                const [
+                    stopLocRes,
+                    routesMetaRes,
+                    stopsMetaRes,
+                    polysRes,
+                    polyStopRes,
+                    spatialRes,
+                ] = await Promise.all([
                     fetch(STOP_LOCATION_URL),
                     fetch(ROUTES_METADATA_URL),
-                    fetch(STOPS_METADATA_URL)
+                    fetch(STOPS_METADATA_URL),
+                    fetch(POLYGONS_URL),
+                    fetch(POLYGON_STOP_MAPPING_URL),
+                    fetch(SPATIAL_DELAY_URL),
                 ]);
 
                 if (!stopLocRes.ok) throw new Error("stop_location.json failed");
-                if (!routesMetaRes.ok) throw new Error("routes_metadata.json failed");
+                if (!routesMetaRes.ok)
+                    throw new Error("routes_metadata.json failed");
                 if (!stopsMetaRes.ok) throw new Error("stops_metadata.json failed");
+                if (!polysRes.ok) throw new Error("polygons.geojson failed");
+                if (!polyStopRes.ok)
+                    throw new Error("polygon_stop_mapping.json failed");
+                if (!spatialRes.ok)
+                    throw new Error("spatial_delay_data.json failed");
 
                 stopLocations = await stopLocRes.json();
                 routesMetadata = await routesMetaRes.json();
                 stopsMetadata = await stopsMetaRes.json();
+                polygonsGeoJson = await polysRes.json();
+                polygonStopMapping = await polyStopRes.json();
+                spatialDelayData = await spatialRes.json();
+
+                // Preprocess spatial delay: flip polarity & compute global min/max
+                const means = [];
+                polygonMeanDelays = {};
+                for (const gid of Object.keys(spatialDelayData)) {
+                    const entry = spatialDelayData[gid];
+                    if (!Array.isArray(entry) || entry.length < 2) continue;
+                    const meanRaw = entry[0];
+                    const hist = entry[1];
+
+                    if (typeof meanRaw === "number") {
+                        const meanFlipped = -meanRaw; // flip polarity
+                        polygonMeanDelays[gid] = meanFlipped;
+                        means.push(meanFlipped);
+                    }
+
+                    // histogram: [freqs, values] – flip polarity of values
+                    if (Array.isArray(hist) && hist.length === 2) {
+                        const bins = hist[1];
+                        if (Array.isArray(bins)) {
+                            hist[1] = bins.map((v) => -v);
+                        }
+                    }
+                }
+                polygonMinMean = means.length ? Math.min(...means) : null;
+                polygonMaxMean = means.length ? Math.max(...means) : null;
 
                 metaLoaded = true;
-                overlay.textContent = "Metadata loaded. Click on the map to explore nearby routes.";
+                overlay.textContent =
+                    "Hover a shaded area to see its delay distribution. Click to explore routes.";
                 setTimeout(() => {
                     overlay.style.display = "none";
-                }, 1000);
+                }, 1500);
+
+                initPolygonsLayer();
             } catch (err) {
                 console.error(err);
-                overlay.textContent = "Error loading metadata. Please refresh the page.";
+                overlay.textContent =
+                    "Error loading metadata. Please refresh the page.";
             }
         }
 
-        function initMap() {
-            map = L.map('map').setView(SF_CENTER, 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+        // --- Polygon rendering & interaction --------------------------------
+
+        function colorForPolygonMean(meanVal) {
+            if (
+                meanVal == null ||
+                polygonMinMean == null ||
+                polygonMaxMean == null
+            ) {
+                return "#d7dde5";
+            }
+            const min = polygonMinMean;
+            const max = polygonMaxMean;
+            const span = max - min || 1;
+            let t = (meanVal - min) / span;
+            t = Math.max(0, Math.min(1, t));
+            // interpolate between light yellow (#fff7bc) and deep red (#e34a33)
+            const c1 = [0xff, 0xf7, 0xbc];
+            const c2 = [0xe3, 0x4a, 0x33];
+            const r = Math.round(c1[0] + t * (c2[0] - c1[0]));
+            const g = Math.round(c1[1] + t * (c2[1] - c1[1]));
+            const b = Math.round(c1[2] + t * (c2[2] - c1[2]));
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function initPolygonsLayer() {
+            if (!polygonsGeoJson) return;
+
+            polygonsLayer.clearLayers();
+
+            polygonsLayer = L.geoJSON(polygonsGeoJson, {
+                style: (feature) => {
+                    const gid =
+                        feature.properties && feature.properties.gid != null
+                            ? String(feature.properties.gid)
+                            : null;
+                    const meanVal =
+                        gid && polygonMeanDelays[gid] != null
+                            ? polygonMeanDelays[gid]
+                            : null;
+                    return {
+                        color: "#666",
+                        weight: 1,
+                        fillColor: colorForPolygonMean(meanVal),
+                        fillOpacity: 0.5,
+                    };
+                },
+                onEachFeature: (feature, layer) => {
+                    const gid =
+                        feature.properties && feature.properties.gid != null
+                            ? String(feature.properties.gid)
+                            : null;
+                    if (!gid) return;
+
+                    layer.on("mouseover", () => {
+                        showPolygonHistogram(gid);
+                    });
+
+                    layer.on("click", (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        onPolygonClick(gid);
+                    });
+                },
             }).addTo(map);
-
-            routesLayerGroup = L.layerGroup().addTo(map);
-            stopsLayerGroup = L.layerGroup().addTo(map);
-
-            map.on('click', onMapClick);
         }
 
-        async function onMapClick(e) {
-            // Disable map clicks when route selected
-            if (selectedRouteId) return;
-            if (!metaLoaded) {
-                alert("Metadata not loaded yet. Please wait a moment and try again.");
-                return;
+        function showPolygonHistogram(gid) {
+            if (!spatialDelayData) return;
+            const entry = spatialDelayData[gid];
+            if (!entry || entry.length < 2) return;
+            const hist = entry[1];
+            if (!Array.isArray(hist) || hist.length < 2) return;
+            const freqs = hist[0];
+            const bins = hist[1];
+            if (!Array.isArray(freqs) || !Array.isArray(bins)) return;
+
+            const canvas = document.getElementById("polygonHistogramChart");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+
+            if (polygonHistogramChart) {
+                polygonHistogramChart.destroy();
+                polygonHistogramChart = null;
             }
 
-            const overlay = document.getElementById("map-overlay");
-            overlay.style.display = "flex";
-            overlay.textContent = "Finding nearest stops and routes…";
-
-            const { lat, lng } = e.latlng;
-            const k = getNearestCount();
-
-            try {
-                const nearestStops = findNearestStops(lat, lng, k);
-                const routeIds = await getRoutesForStops(nearestStops.map(s => s.stop_id));
-                await drawRoutesAndStops(nearestStops, routeIds);
-
-                overlay.style.display = "none";
-            } catch (err) {
-                console.error(err);
-                overlay.textContent = "Error loading routes. See console for details.";
-            }
+            polygonHistogramChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: bins.map((v) => v.toFixed(0)), // delay in seconds
+                    datasets: [
+                        {
+                            label: "Frequency",
+                            data: freqs,
+                            backgroundColor: "rgba(52, 152, 219, 0.55)",
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: "Delay (sec, polarity flipped)",
+                            },
+                        },
+                        y: {
+                            title: { display: true, text: "Count" },
+                        },
+                    },
+                },
+            });
         }
 
-        function findNearestStops(lat, lon, k) {
-            const all = [];
-            for (const stopId in stopLocations) {
-                const [sLat, sLon] = stopLocations[stopId];
-                const dist = euclideanDistance(lat, lon, sLat, sLon);
-                all.push({ stop_id: stopId, lat: sLat, lon: sLon, dist });
-            }
-            all.sort((a, b) => a.dist - b.dist);
-            return all.slice(0, k);
+        async function onPolygonClick(gid) {
+            if (!metaLoaded) return;
+
+            selectedPolygonGid = gid;
+            selectedRouteId = null;
+            selectedStopId = null;
+
+            updateSelectedRouteInfo();
+            updateSelectedStopInfo();
+            clearCharts();
+
+            // Route/stop list visibility
+            document.getElementById("route-list-section").style.display =
+                "block";
+            document.getElementById("stop-list-section").style.display = "none";
+            document.getElementById("chart-area").style.display = "none";
+
+            // Determine stops in polygon and routes serving them
+            const stopIds = polygonStopMapping[gid] || [];
+            const routeIds = await getRoutesForStops(stopIds);
+
+            await drawRoutesAndStopsForPolygon(stopIds, routeIds);
+            populateRouteList(routeIds);
         }
+
+        // --- Routes & stops --------------------------------------------------
 
         async function getRoutesForStops(stopIds) {
             const routeSet = new Set();
-            await Promise.all(stopIds.map(async (sid) => {
-                if (!stopRouteMappingCache[sid]) {
-                    const url = `${STOP_ROUTE_MAPPING_BASE}/${sid}.json`;
-                    const res = await fetch(url);
-                    if (!res.ok) {
-                        console.warn(`No stop_route_mapping for stop ${sid}`);
-                        stopRouteMappingCache[sid] = [];
-                    } else {
-                        stopRouteMappingCache[sid] = await res.json();
+            await Promise.all(
+                stopIds.map(async (sid) => {
+                    const key = String(sid);
+                    if (!stopRouteMappingCache[key]) {
+                        const url = `${STOP_ROUTE_MAPPING_BASE}/${key}.json`;
+                        try {
+                            const res = await fetch(url);
+                            if (!res.ok) {
+                                console.warn(
+                                    "No stop_route_mapping for stop",
+                                    key
+                                );
+                                stopRouteMappingCache[key] = [];
+                            } else {
+                                stopRouteMappingCache[key] = await res.json();
+                            }
+                        } catch (err) {
+                            console.error("stop_route_mapping fetch error", err);
+                            stopRouteMappingCache[key] = [];
+                        }
                     }
-                }
-                stopRouteMappingCache[sid].forEach(rid => routeSet.add(rid));
-            }));
-            return Array.from(routeSet);
-        }
-
-        function normalizeRouteSequences(raw, routeId) {
-            // Recursively extract sequences of stop_ids from any nested structure.
-            function collectSequences(node) {
-                if (!node) return [];
-
-                // If node is an array
-                if (Array.isArray(node)) {
-                    if (node.length === 0) return [];
-
-                    const allScalars = node.every(v => typeof v === "string" || typeof v === "number");
-                    if (allScalars) {
-                        // This is a single sequence: list of stop_ids
-                        return [node.map(String)];
+                    for (const rid of stopRouteMappingCache[key]) {
+                        routeSet.add(String(rid));
                     }
-
-                    // Mixed content: recursively collect from children
-                    let out = [];
-                    node.forEach(child => {
-                        out = out.concat(collectSequences(child));
-                    });
-                    return out;
-                }
-
-                // If node is an object, collect from its values
-                if (typeof node === "object") {
-                    let out = [];
-                    Object.values(node).forEach(child => {
-                        out = out.concat(collectSequences(child));
-                    });
-                    return out;
-                }
-
-                // Anything else: ignore
-                return [];
-            }
-
-            const seqs = collectSequences(raw);
-            if (seqs.length === 0) {
-                console.warn("normalizeRouteSequences(): no sequences for route", routeId, raw);
-            }
-            return seqs;
-        }
-
-        function ensureStopMarker(stopId, loc, nearestStops, routeId) {
-            const [lat, lon] = loc;
-            if (!stopMarkerIndex[stopId]) {
-                const stopMeta = stopsMetadata[stopId] || {};
-                const nearestTag = nearestStops.some(ns => ns.stop_id === stopId)
-                    ? "<br><b>Near click</b>" : "";
-
-                const marker = L.circleMarker([lat, lon], {
-                    // SMALL before route is selected
-                    radius: 6,
-                    color: '#34495e',
-                    fillColor: '#3498db',
-                    fillOpacity: 0.9
                 })
-                    .bindPopup(
-                        `<b>${stopMeta.name || 'Stop ' + stopId}</b><br>` +
-                        `Stop ID: ${stopId}${nearestTag}` +
-                        (stopMeta.link ? `<br><a href="${stopMeta.link}" target="_blank">Info</a>` : "")
-                    )
-                    .on('click', () => onStopClick(stopId));
-
-                stopsLayerGroup.addLayer(marker);
-                stopMarkerIndex[stopId] = {
-                    marker,
-                    routes: new Set([routeId])
-                };
-            } else {
-                stopMarkerIndex[stopId].routes.add(routeId);
-            }
+            );
+            return Array.from(routeSet).sort();
         }
 
-        async function drawRoutesAndStops(nearestStops, routeIds) {
+        async function drawRoutesAndStopsForPolygon(stopIds, routeIds) {
             routesLayerGroup.clearLayers();
             stopsLayerGroup.clearLayers();
             routeLayerIndex = {};
             stopMarkerIndex = {};
-            selectedRouteId = null;
-            updateSelectedRouteInfo(null);
-            updateSelectedStopInfo(null);
-            clearCharts();
-
-            // Load route edges for all routes
-            await Promise.all(routeIds.map(async (rid) => {
-                if (!routeStopMappingCache[rid]) {
-                    const url = `${BASE_META_URL}/route_edges/${rid}.json`;
-                    const res = await fetch(url);
-                    if (!res.ok) {
-                        console.warn(`No route_edges for route ${rid}`);
-                        routeStopMappingCache[rid] = [];
-                    } else {
-                        routeStopMappingCache[rid] = await res.json();
-                    }
-                }
-            }));
 
             const bounds = [];
+            const stopSet = new Set(stopIds.map(String));
 
-            routeIds.forEach(routeId => {
-                const edges = routeStopMappingCache[routeId] || [];
-                const routeMeta = routesMetadata[routeId] || {};
-                const color = routeMeta.color ? `#${routeMeta.color}` : "#2980b9";
+            // Ensure route edges are loaded
+            await Promise.all(
+                routeIds.map(async (routeId) => {
+                    if (!routeEdgesCache[routeId]) {
+                        const url = `${ROUTE_EDGES_BASE}/${routeId}.json`;
+                        try {
+                            const res = await fetch(url);
+                            if (!res.ok) {
+                                console.warn("No route_edges for", routeId);
+                                routeEdgesCache[routeId] = [];
+                            } else {
+                                routeEdgesCache[routeId] = await res.json();
+                            }
+                        } catch (err) {
+                            console.error("route_edges fetch error", err);
+                            routeEdgesCache[routeId] = [];
+                        }
+                    }
+                })
+            );
+
+            routeIds.forEach((routeId) => {
+                const edges = routeEdgesCache[routeId] || [];
+                const meta = routesMetadata[routeId] || {};
+                const baseColor = meta.color
+                    ? `#${meta.color}`
+                    : "#2980b9";
 
                 routeLayerIndex[routeId] = [];
+                const edgeSet = new Set(
+                    edges.map(([a, b]) => `${a}_${b}`)
+                );
 
-                // Precompute reverse edges for quick lookup
-                const edgeSet = new Set(edges.map(([a, b]) => `${a}_${b}`));
-
-                edges.forEach(([stopA, stopB]) => {
-                    const locA = stopLocations[stopA];
-                    const locB = stopLocations[stopB];
+                edges.forEach(([fromId, toId]) => {
+                    const locA = stopLocations[fromId];
+                    const locB = stopLocations[toId];
                     if (!locA || !locB) return;
 
-                    bounds.push([locA[0], locA[1]]);
-                    bounds.push([locB[0], locB[1]]);
+                    const [latA, lonA] = locA;
+                    const [latB, lonB] = locB;
 
-                    // ensure stop markers
-                    ensureStopMarker(stopA, locA, nearestStops, routeId);
-                    ensureStopMarker(stopB, locB, nearestStops, routeId);
+                    bounds.push([latA, lonA], [latB, lonB]);
 
-                    const hasReverse = edgeSet.has(`${stopB}_${stopA}`);
+                    if (stopSet.has(String(fromId))) {
+                        ensureStopMarker(String(fromId), locA, routeId);
+                    }
+                    if (stopSet.has(String(toId))) {
+                        ensureStopMarker(String(toId), locB, routeId);
+                    }
+
+                    const hasReverse = edgeSet.has(`${toId}_${fromId}`);
+                    const weight = hasReverse ? 5 : 3;
+                    const opacity = hasReverse ? 1.0 : 0.9;
 
                     const line = L.polyline(
                         [
-                            [locA[0], locA[1]],
-                            [locB[0], locB[1]]
+                            [latA, lonA],
+                            [latB, lonB],
                         ],
                         {
-                            color,
-                            weight: hasReverse ? 6 : 3,
-                            opacity: hasReverse ? 1.0 : 0.85
+                            color: baseColor,
+                            weight,
+                            opacity,
                         }
-                    ).on('click', (e) => {
+                    ).on("click", (e) => {
                         L.DomEvent.stopPropagation(e);
                         onRouteClick(routeId);
                     });
 
                     if (hasReverse) {
-                        line.bindTooltip("Two-way connection", { sticky: true });
+                        line.bindTooltip("Two-way connection", {
+                            sticky: true,
+                        });
                     } else {
-                        line.bindTooltip(`${routeMeta.name || 'Route ' + routeId}`, { sticky: true });
+                        const label = meta.name || `Route ${routeId}`;
+                        line.bindTooltip(`${label} – direction`, {
+                            sticky: true,
+                        });
                     }
 
                     routesLayerGroup.addLayer(line);
@@ -603,287 +705,397 @@
                 map.fitBounds(bounds, { padding: [40, 40] });
             }
 
-            // Ensure stop markers are above route lines
-            Object.values(stopMarkerIndex).forEach(entry => {
-                if (entry && entry.marker && entry.marker.bringToFront) {
-                    entry.marker.bringToFront();
-                }
-            });
-
-            // Force stops layer to render above routes layer
-            map.removeLayer(routesLayerGroup);
-            map.removeLayer(stopsLayerGroup);
-            routesLayerGroup.addTo(map);
-            stopsLayerGroup.addTo(map);
+            // Keep stops visually on top of routes
+            stopsLayerGroup.bringToFront();
         }
 
-        function updateSelectedRouteInfo(routeId) {
-            const el = document.getElementById("selected-route-info");
-            if (!routeId) {
-                el.innerHTML = '<span class="status-label">Selected route:</span> None';
-                return;
+        function ensureStopMarker(stopId, loc, routeId) {
+            const [lat, lon] = loc;
+            if (!stopMarkerIndex[stopId]) {
+                const meta = stopsMetadata[stopId] || {};
+                const marker = L.circleMarker([lat, lon], {
+                    radius: 6,
+                    color: "#34495e",
+                    fillColor: "#3498db",
+                    fillOpacity: 0.9,
+                }).on("click", (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    if (selectedRouteId) {
+                        onStopClick(stopId);
+                    }
+                });
+
+                marker.bindPopup(
+                    `<b>${meta.name || "Stop " + stopId}</b><br/>Stop ID: ${stopId}`
+                );
+
+                stopsLayerGroup.addLayer(marker);
+                stopMarkerIndex[stopId] = {
+                    marker,
+                    routes: new Set([routeId]),
+                };
+            } else {
+                stopMarkerIndex[stopId].routes.add(routeId);
             }
-            const meta = routesMetadata[routeId] || {};
-            const label = meta.name || routeId;
-            const link = meta.link
-                ? ` (<a href="${meta.link}" target="_blank">route info</a>)`
-                : "";
-            el.innerHTML = `<span class="status-label">Selected route:</span> ${label} [${routeId}]${link}`;
         }
 
-        function updateSelectedStopInfo(stopId) {
-            const el = document.getElementById("selected-stop-info");
-            if (!stopId) {
-                el.innerHTML = '<span class="status-label">Selected stop:</span> None';
-                return;
-            }
-            const meta = stopsMetadata[stopId] || {};
-            const label = meta.name || stopId;
-            const link = meta.link
-                ? ` (<a href="${meta.link}" target="_blank">stop info</a>)`
-                : "";
-            el.innerHTML = `<span class="status-label">Selected stop:</span> ${label} [${stopId}]${link}`;
-        }
+        // --- Route & stop selection -----------------------------------------
 
         function onRouteClick(routeId) {
             selectedRouteId = routeId;
-            updateSelectedRouteInfo(routeId);
+            updateSelectedRouteInfo();
             styleRoutesAndStopsForSelection();
+            populateStopList(routeId);
+
+            // Hide polygons while a route is in focus
+            if (polygonsLayer && map.hasLayer(polygonsLayer)) {
+                map.removeLayer(polygonsLayer);
+            }
+        }
+
+        function populateRouteList(routeIds) {
+            const container = document.getElementById("route-list");
+            container.innerHTML = "";
+            routeIds.forEach((rid) => {
+                const meta = routesMetadata[rid] || {};
+                const label = meta.name || rid;
+                const btn = document.createElement("button");
+                btn.className = "pill-button";
+                btn.textContent = label;
+                btn.onclick = () => onRouteClick(rid);
+                container.appendChild(btn);
+            });
+        }
+
+        function populateStopList(routeId) {
+            const stopSection = document.getElementById("stop-list-section");
+            const routeSection = document.getElementById("route-list-section");
+            const container = document.getElementById("stop-list");
+
+            if (!selectedPolygonGid) return;
+
+            const stopsInPolygon = new Set(
+                (polygonStopMapping[selectedPolygonGid] || []).map(String)
+            );
+            const edges = routeEdgesCache[routeId] || [];
+            const stopsForRoute = new Set();
+            edges.forEach(([a, b]) => {
+                if (stopsInPolygon.has(String(a))) stopsForRoute.add(String(a));
+                if (stopsInPolygon.has(String(b))) stopsForRoute.add(String(b));
+            });
+
+            container.innerHTML = "";
+            Array.from(stopsForRoute)
+                .sort()
+                .forEach((sid) => {
+                    const meta = stopsMetadata[sid] || {};
+                    const label = meta.name || sid;
+                    const btn = document.createElement("button");
+                    btn.className = "pill-button";
+                    btn.textContent = label;
+                    btn.onclick = () => onStopClick(sid);
+                    container.appendChild(btn);
+                });
+
+            routeSection.style.display = "none";
+            stopSection.style.display = "block";
         }
 
         function styleRoutesAndStopsForSelection() {
-            Object.keys(routeLayerIndex).forEach(rid => {
+            // Routes
+            Object.keys(routeLayerIndex).forEach((rid) => {
                 const meta = routesMetadata[rid] || {};
                 const baseColor = meta.color ? `#${meta.color}` : "#2980b9";
-                const isSelected = selectedRouteId && rid === selectedRouteId;
+                const isSelected = selectedRouteId === rid;
+                const opacity = isSelected ? 0.95 : 0.18;
 
-                routeLayerIndex[rid].forEach(line => {
+                routeLayerIndex[rid].forEach((line) => {
                     line.setStyle({
-                        color: isSelected ? baseColor : "#bdc3c7",
-                        opacity: isSelected ? 0.9 : 0.2,
-                        weight: isSelected ? 5 : 3
+                        color: baseColor,
+                        opacity,
+                        weight: 3,
                     });
                 });
             });
 
-            // Always keep stops above lines
-            Object.keys(stopMarkerIndex).forEach(sid => {
+            // Stops
+            Object.keys(stopMarkerIndex).forEach((sid) => {
                 const entry = stopMarkerIndex[sid];
-                const isOnSelected = !selectedRouteId || entry.routes.has(selectedRouteId);
-                // Determine color based on delay (use latest known delay)
-                const key0 = `${selectedRouteId}_0_${sid}`;
-                const key1 = `${selectedRouteId}_1_${sid}`;
-                let latestDelay = null;
-                if (delayDataCache[key0] && delayDataCache[key0].length > 0) {
-                    latestDelay = delayDataCache[key0][delayDataCache[key0].length - 1].delay;
-                }
-                if (delayDataCache[key1] && delayDataCache[key1].length > 0) {
-                    latestDelay = delayDataCache[key1][delayDataCache[key1].length - 1].delay;
-                }
-
-                let fillColor = isOnSelected ? '#3498db' : '#ecf0f1';
-                if (latestDelay != null) {
-                    fillColor = latestDelay < 0 ? '#e74c3c' : '#3498db';
-                }
+                const isOnSelected =
+                    selectedRouteId &&
+                    entry.routes &&
+                    entry.routes.has(selectedRouteId);
+                const radius = isOnSelected ? 8 : 5;
+                const fillOpacity = isOnSelected ? 0.9 : 0.25;
 
                 entry.marker.setStyle({
-                    radius: isOnSelected ? 10 : 6,
-                    fillOpacity: isOnSelected ? 0.9 : 0.25,
-                    color: isOnSelected ? '#34495e' : '#bdc3c7',
-                    fillColor: fillColor
+                    radius,
+                    fillOpacity,
                 });
-                if (entry.marker.bringToFront) entry.marker.bringToFront();
+                if (entry.marker.bringToFront) {
+                    entry.marker.bringToFront();
+                }
             });
         }
 
-        function clearRouteSelection() {
-    const chartArea = document.getElementById("chart-area");
-    selectedRouteId = null;
-    updateSelectedRouteInfo(null);
-    updateSelectedStopInfo(null);
-    clearCharts();
-    if (chartArea) chartArea.style.display = "none";
-
-    // Reset all stop markers to initial small size
-    Object.values(stopMarkerIndex).forEach(entry => {
-        if (entry && entry.marker) {
-            entry.marker.setStyle({
-                radius: 6,
-                fillOpacity: 0.9,
-                color: '#34495e',
-                fillColor: '#3498db'
-            });
-            if (entry.marker.bringToFront) entry.marker.bringToFront();
-        }
-    });
-
-    // Reset all route lines to normal visibility
-    Object.keys(routeLayerIndex).forEach(rid => {
-        const meta = routesMetadata[rid] || {};
-        const baseColor = meta.color ? `#${meta.color}` : "#2980b9";
-        routeLayerIndex[rid].forEach(line => {
-            line.setStyle({
-                color: baseColor,
-                opacity: 0.85,
-                weight: 3
-            });
-        });
-    });
-}
-
-
-        async function onStopClick(stopId) {
+        function updateSelectedRouteInfo() {
+            const span = document.getElementById("selected-route-label");
             if (!selectedRouteId) {
-                alert("Please select a route first (click on a route line), then click a stop.");
+                span.textContent = "Route: none";
                 return;
             }
-            updateSelectedStopInfo(stopId);
+            const meta = routesMetadata[selectedRouteId] || {};
+            span.textContent = `Route: ${meta.name || selectedRouteId}`;
+        }
 
-            try {
-                const samplesDir0 = await getDelaySamples(selectedRouteId, 0, stopId);
-                const samplesDir1 = await getDelaySamples(selectedRouteId, 1, stopId);
-
-                const anyData = (samplesDir0.length + samplesDir1.length) > 0;
-                if (!anyData) {
-                    alert("No delay data found for this route / direction / stop combination.");
-                    return;
-                }
-
-                const chartArea = document.getElementById("chart-area");
-                if (chartArea) chartArea.style.display = "grid";
-
-                renderCharts(samplesDir0, samplesDir1);
-            } catch (err) {
-                console.error(err);
-                alert("Error loading delay data for this stop.");
+        function updateSelectedStopInfo() {
+            const span = document.getElementById("selected-stop-label");
+            if (!selectedStopId) {
+                span.textContent = "Stop: none";
+                return;
             }
+            const meta = stopsMetadata[selectedStopId] || {};
+            span.textContent = `Stop: ${
+                meta.name || selectedStopId
+            } (ID ${selectedStopId})`;
+        }
+
+        // --- Stop-level delay charts ----------------------------------------
+
+        async function onStopClick(stopId) {
+            if (!selectedRouteId) return;
+
+            selectedStopId = stopId;
+            updateSelectedStopInfo();
+
+            const chartArea = document.getElementById("chart-area");
+            chartArea.style.display = "grid";
+
+            const [dir0Samples, dir1Samples] = await Promise.all([
+                getDelaySamples(selectedRouteId, 0, stopId),
+                getDelaySamples(selectedRouteId, 1, stopId),
+            ]);
+
+            renderChartsForDirection(
+                dir0Samples,
+                "hourlyDelayChartDir0",
+                "dailyDelayChartDir0",
+                "hourlyDir0Container",
+                "dailyDir0Container"
+            );
+            renderChartsForDirection(
+                dir1Samples,
+                "hourlyDelayChartDir1",
+                "dailyDelayChartDir1",
+                "hourlyDir1Container",
+                "dailyDir1Container"
+            );
         }
 
         async function getDelaySamples(routeId, directionId, stopId) {
-            const key = `${routeId}_${directionId}_${stopId}`;
-            if (delayDataCache[key]) return delayDataCache[key];
-
             const url = `${ROUTE_DIR_STOP_DELAY_BASE}/${routeId}/${directionId}/${stopId}.json`;
-            const res = await fetch(url);
-            if (!res.ok) {
-                console.warn(`No delay data for ${key}`);
-                delayDataCache[key] = [];
+            try {
+                const res = await fetch(url);
+                if (!res.ok) {
+                    console.warn(
+                        "No delay data for",
+                        routeId,
+                        directionId,
+                        stopId
+                    );
+                    return [];
+                }
+                const raw = await res.json();
+                // raw: [[unix_time, delay_in_seconds], ...]
+                return raw.map(([t, d]) => ({
+                    t: new Date(t * 1000),
+                    delay: -d, // flip polarity for this UI
+                }));
+            } catch (err) {
+                console.error("getDelaySamples error", err);
                 return [];
             }
-            const raw = await res.json();
-            const samples = raw.map(([t, d]) => ({
-                t,
-                delay: -d
-            }));
-            delayDataCache[key] = samples;
-            return samples;
+        }
+
+        function renderChartsForDirection(
+            samples,
+            hourlyCanvasId,
+            dailyCanvasId,
+            hourlyContainerId,
+            dailyContainerId
+        ) {
+            const hourlyContainer = document.getElementById(hourlyContainerId);
+            const dailyContainer = document.getElementById(dailyContainerId);
+
+            if (!samples || samples.length === 0) {
+                // Hide both containers if no data
+                hourlyContainer.style.display = "none";
+                dailyContainer.style.display = "none";
+                destroyChart(hourlyCanvasId);
+                destroyChart(dailyCanvasId);
+                return;
+            }
+
+            const hourly = aggregateByHour(samples);
+            const daily = aggregateByDay(samples);
+
+            hourlyContainer.style.display = "block";
+            dailyContainer.style.display = "block";
+
+            destroyChart(hourlyCanvasId);
+            destroyChart(dailyCanvasId);
+
+            if (hourly.labels.length > 0) {
+                const chart = renderLineChartWithBand(
+                    hourlyCanvasId,
+                    hourly.labels,
+                    hourly.median,
+                    hourly.mad,
+                    "Median delay"
+                );
+                if (hourlyCanvasId === "hourlyDelayChartDir0")
+                    hourlyDelayChartDir0 = chart;
+                if (hourlyCanvasId === "hourlyDelayChartDir1")
+                    hourlyDelayChartDir1 = chart;
+            }
+
+            if (daily.labels.length > 0) {
+                const chart = renderLineChartWithBand(
+                    dailyCanvasId,
+                    daily.labels,
+                    daily.median,
+                    daily.mad,
+                    "Median delay"
+                );
+                if (dailyCanvasId === "dailyDelayChartDir0")
+                    dailyDelayChartDir0 = chart;
+                if (dailyCanvasId === "dailyDelayChartDir1")
+                    dailyDelayChartDir1 = chart;
+            }
+        }
+
+        function destroyChart(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
+            // We track references explicitly, so destroy them there
+            switch (canvasId) {
+                case "hourlyDelayChartDir0":
+                    if (hourlyDelayChartDir0) hourlyDelayChartDir0.destroy();
+                    hourlyDelayChartDir0 = null;
+                    break;
+                case "hourlyDelayChartDir1":
+                    if (hourlyDelayChartDir1) hourlyDelayChartDir1.destroy();
+                    hourlyDelayChartDir1 = null;
+                    break;
+                case "dailyDelayChartDir0":
+                    if (dailyDelayChartDir0) dailyDelayChartDir0.destroy();
+                    dailyDelayChartDir0 = null;
+                    break;
+                case "dailyDelayChartDir1":
+                    if (dailyDelayChartDir1) dailyDelayChartDir1.destroy();
+                    dailyDelayChartDir1 = null;
+                    break;
+            }
         }
 
         function clearCharts() {
-            if (hourlyDelayChartDir0) {
-                hourlyDelayChartDir0.destroy();
-                hourlyDelayChartDir0 = null;
-            }
-            if (hourlyDelayChartDir1) {
-                hourlyDelayChartDir1.destroy();
-                hourlyDelayChartDir1 = null;
-            }
-            if (dailyDelayChartDir0) {
-                dailyDelayChartDir0.destroy();
-                dailyDelayChartDir0 = null;
-            }
-            if (dailyDelayChartDir1) {
-                dailyDelayChartDir1.destroy();
-                dailyDelayChartDir1 = null;
-            }
+            destroyChart("hourlyDelayChartDir0");
+            destroyChart("hourlyDelayChartDir1");
+            destroyChart("dailyDelayChartDir0");
+            destroyChart("dailyDelayChartDir1");
+
+            document.getElementById("hourlyDir0Container").style.display =
+                "none";
+            document.getElementById("hourlyDir1Container").style.display =
+                "none";
+            document.getElementById("dailyDir0Container").style.display =
+                "none";
+            document.getElementById("dailyDir1Container").style.display =
+                "none";
+
+            document.getElementById("chart-area").style.display = "none";
         }
 
-        function renderCharts(samplesDir0, samplesDir1) {
-            clearCharts();
-
-            const chartArea = document.getElementById("chart-area");
-            if (!chartArea) return;
-
-            // Get chart containers
-            const hourly0Container = document.getElementById("hourlyDelayChartDir0").parentElement;
-            const hourly1Container = document.getElementById("hourlyDelayChartDir1").parentElement;
-            const daily0Container = document.getElementById("dailyDelayChartDir0").parentElement;
-            const daily1Container = document.getElementById("dailyDelayChartDir1").parentElement;
-
-            // Hide all first
-            hourly0Container.style.display = "none";
-            hourly1Container.style.display = "none";
-            daily0Container.style.display = "none";
-            daily1Container.style.display = "none";
-
-            // DIR 0
-            if (samplesDir0.length > 0) {
-                const hourlyBuckets0 = groupByHour(samplesDir0);
-                const hourLabels = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, "0") + ":00");
-                const hourlyMean0 = []; const hourlyStd0 = [];
-                for (let h = 0; h < 24; h++) {
-                    const stats = computeMeanStd(hourlyBuckets0[h]);
-                    hourlyMean0.push(stats.mean);
-                    hourlyStd0.push(stats.std);
-                }
-                hourlyDelayChartDir0 = renderLineChartWithBand("hourlyDelayChartDir0", hourLabels, hourlyMean0, hourlyStd0, "Median delay");
-                hourly0Container.style.display = "block";
-
-                const dailyGroups0 = groupByDate(samplesDir0);
-                const dateLabels0 = Object.keys(dailyGroups0).sort();
-                const dailyMean0 = [], dailyStd0 = [];
-                dateLabels0.forEach(d => {
-                    const stats = computeMeanStd(dailyGroups0[d]);
-                    dailyMean0.push(stats.mean);
-                    dailyStd0.push(stats.std);
-                });
-                dailyDelayChartDir0 = renderLineChartWithBand("dailyDelayChartDir0", dateLabels0, dailyMean0, dailyStd0, "Median delay");
-                daily0Container.style.display = "block";
-            }
-
-            // DIR 1
-            if (samplesDir1.length > 0) {
-                const hourlyBuckets1 = groupByHour(samplesDir1);
-                const hourLabels = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, "0") + ":00");
-                const hourlyMean1 = []; const hourlyStd1 = [];
-                for (let h = 0; h < 24; h++) {
-                    const stats = computeMeanStd(hourlyBuckets1[h]);
-                    hourlyMean1.push(stats.mean);
-                    hourlyStd1.push(stats.std);
-                }
-                hourlyDelayChartDir1 = renderLineChartWithBand("hourlyDelayChartDir1", hourLabels, hourlyMean1, hourlyStd1, "Median delay");
-                hourly1Container.style.display = "block";
-
-                const dailyGroups1 = groupByDate(samplesDir1);
-                const dateLabels1 = Object.keys(dailyGroups1).sort();
-                const dailyMean1 = [], dailyStd1 = [];
-                dateLabels1.forEach(d => {
-                    const stats = computeMeanStd(dailyGroups1[d]);
-                    dailyMean1.push(stats.mean);
-                    dailyStd1.push(stats.std);
-                });
-                dailyDelayChartDir1 = renderLineChartWithBand("dailyDelayChartDir1", dateLabels1, dailyMean1, dailyStd1, "Median delay");
-                daily1Container.style.display = "block";
-            }
+        // Aggregation helpers: median + MAD
+        function aggregateByHour(samples) {
+            const buckets = {};
+            samples.forEach(({ t, delay }) => {
+                const h = t.getHours();
+                const key = h.toString().padStart(2, "0") + ":00";
+                if (!buckets[key]) buckets[key] = [];
+                buckets[key].push(delay);
+            });
+            const labels = Object.keys(buckets).sort();
+            const medianVals = [];
+            const madVals = [];
+            labels.forEach((k) => {
+                const vals = buckets[k];
+                const med = median(vals);
+                const madVal = mad(vals, med);
+                medianVals.push(med);
+                madVals.push(madVal);
+            });
+            return { labels, median: medianVals, mad: madVals };
         }
 
-        // old code removed
+        function aggregateByDay(samples) {
+            const buckets = {};
+            samples.forEach(({ t, delay }) => {
+                const key = t.toISOString().slice(0, 10); // YYYY-MM-DD
+                if (!buckets[key]) buckets[key] = [];
+                buckets[key].push(delay);
+            });
+            const labels = Object.keys(buckets).sort();
+            const medianVals = [];
+            const madVals = [];
+            labels.forEach((k) => {
+                const vals = buckets[k];
+                const med = median(vals);
+                const madVal = mad(vals, med);
+                medianVals.push(med);
+                madVals.push(madVal);
+            });
+            return { labels, median: medianVals, mad: madVals };
+        }
 
-        function renderLineChartWithBand(canvasId, labels, seriesVals, bandVals, label) {
+        function median(arr) {
+            if (!arr || arr.length === 0) return null;
+            const a = [...arr].sort((x, y) => x - y);
+            const n = a.length;
+            const mid = Math.floor(n / 2);
+            if (n % 2 === 1) return a[mid];
+            return 0.5 * (a[mid - 1] + a[mid]);
+        }
+
+        function mad(arr, med) {
+            if (!arr || arr.length === 0 || med == null) return 0;
+            const devs = arr.map((v) => Math.abs(v - med));
+            return median(devs);
+        }
+
+        function renderLineChartWithBand(
+            canvasId,
+            labels,
+            seriesVals,
+            bandVals,
+            label
+        ) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return null;
             const ctx = canvas.getContext("2d");
 
-            // Build upper/lower curves from median (seriesVals) ± MAD (bandVals)
             const upper = seriesVals.map((v, i) =>
-                (v != null && bandVals[i] != null) ? v + bandVals[i] : null
+                v != null && bandVals[i] != null ? v + bandVals[i] : null
             );
             const lower = seriesVals.map((v, i) =>
-                (v != null && bandVals[i] != null) ? v - bandVals[i] : null
+                v != null && bandVals[i] != null ? v - bandVals[i] : null
             );
 
-            // For y-axis scaling, use only finite median values
-            const validVals = seriesVals.filter(v => v != null && isFinite(v));
+            const validVals = seriesVals.filter(
+                (v) => v != null && isFinite(v)
+            );
             const yMin = validVals.length ? Math.min(...validVals) : undefined;
             const yMax = validVals.length ? Math.max(...validVals) : undefined;
 
@@ -892,51 +1104,47 @@
                 data: {
                     labels,
                     datasets: [
-                        // Main median series
                         {
-                            label: label,
+                            label,
                             data: seriesVals,
                             borderWidth: 2,
                             pointRadius: 3,
                             fill: false,
                             tension: 0.25,
                             borderColor: "#3498db",
-                            backgroundColor: "#3498db"
+                            backgroundColor: "#3498db",
                         },
-                        // Lower curve (no fill by itself)
                         {
-                            label: "Lower bound",
+                            label: "Lower",
                             data: lower,
                             borderWidth: 0,
                             pointRadius: 0,
                             fill: false,
-                            tension: 0.25
+                            tension: 0.25,
                         },
-                        // Upper curve, filled down to the lower curve → single red band
                         {
                             label: "MAD band",
                             data: upper,
                             borderWidth: 0,
                             pointRadius: 0,
-                            fill: "-1", // fill between this and previous dataset (lower)
+                            fill: "-1", // fill between this and previous dataset
                             tension: 0.25,
-                            backgroundColor: "rgba(231, 76, 60, 0.22)"
-                        }
-                    ]
+                            backgroundColor: "rgba(231, 76, 60, 0.22)",
+                        },
+                    ],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     layout: {
-                        padding: { bottom: 50 }
+                        padding: { bottom: 40 },
                     },
                     plugins: {
                         legend: {
                             labels: {
-                                // Only show main series in legend
-                                filter: (item) => item.datasetIndex === 0
-                            }
-                        }
+                                filter: (item) => item.datasetIndex === 0,
+                            },
+                        },
                     },
                     scales: {
                         x: {
@@ -945,42 +1153,57 @@
                                 minRotation: 45,
                                 autoSkip: true,
                                 maxTicksLimit: 8,
-                                padding: 20
+                                padding: 20,
                             },
                             title: {
                                 display: true,
-                                text: labels.length && typeof labels[0] === "string" && labels[0].includes(":")
-                                    ? "Hour of day"
-                                    : "Date"
-                            }
+                                text:
+                                    labels.length &&
+                                    typeof labels[0] === "string" &&
+                                    labels[0].includes(":")
+                                        ? "Hour of day"
+                                        : "Date",
+                            },
                         },
                         y: {
-                            title: { display: true, text: "Delay (sec)" },
-                            ticks: {
-                                padding: 8
+                            title: {
+                                display: true,
+                                text: "Delay (sec, polarity flipped)",
                             },
                             suggestedMin: yMin,
-                            suggestedMax: yMax
-                        }
-                    }
-                }
+                            suggestedMax: yMax,
+                        },
+                    },
+                },
             });
         }
 
-        // (old renderDailyChart removed; handled by renderLineChartWithBand)
+        // --- Clear button ----------------------------------------------------
 
-        document.addEventListener("DOMContentLoaded", () => {
-            initMap();
-            loadMetadata();
+        function clearRouteSelection() {
+            selectedRouteId = null;
+            selectedStopId = null;
 
-            const clearBtn = document.getElementById("clear-route-btn");
-            clearBtn.addEventListener("click", clearRouteSelection);
+            updateSelectedRouteInfo();
+            updateSelectedStopInfo();
+            clearCharts();
 
-            const activeTabButton = document.querySelector(".tabs .tab-button.active");
-            if (activeTabButton) {
-                openTab({ currentTarget: activeTabButton }, "delays");
+            // Clear routes & stops from map
+            routesLayerGroup.clearLayers();
+            stopsLayerGroup.clearLayers();
+            routeLayerIndex = {};
+            stopMarkerIndex = {};
+
+            // Hide route & stop lists
+            document.getElementById("route-list-section").style.display =
+                "none";
+            document.getElementById("stop-list-section").style.display = "none";
+
+            // Bring polygons back if hidden
+            if (polygonsLayer && !map.hasLayer(polygonsLayer)) {
+                polygonsLayer.addTo(map);
             }
-        });
+        }
     </script>
 </body>
 </html>
