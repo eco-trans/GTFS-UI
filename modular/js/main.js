@@ -31,13 +31,12 @@ function updateSelectionBadges() {
 }
 
 window.showRouteListSection = function (show) {
-    const section = document.getElementById('route-list-section');
+    const section = document.getElementById('route-list-controls');
     if (section) section.style.display = show ? 'block' : 'none';
 };
 
 window.showStopListSection = function (show) {
-    const section = document.getElementById('stop-list-section');
-    if (section) section.style.display = show ? 'block' : 'none';
+    // no-op (stop dropdown stays in controls)
 };
 
 window.showChartArea = function (show) {
@@ -60,7 +59,12 @@ window.clearRouteSelection = function () {
     window.stopMarkerIndex = {};
 
     showRouteListSection(false);
-    showStopListSection(false);
+    // stop dropdown reset
+    const stopSelect = document.getElementById('stop-select');
+    if (stopSelect) {
+        stopSelect.disabled = true;
+        stopSelect.innerHTML = '<option>Pick a route first</option>';
+    }
     showChartArea(false);
 
     if (window.polygonsLayer && !window.map.hasLayer(window.polygonsLayer)) {
@@ -72,6 +76,15 @@ function wireControls() {
     const clearBtn = document.getElementById('clear-selection');
     if (clearBtn) {
         clearBtn.addEventListener('click', clearRouteSelection);
+    }
+    const stopSelect = document.getElementById('stop-select');
+    if (stopSelect) {
+        stopSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val) {
+                onStopClick(val);
+            }
+        });
     }
 }
 

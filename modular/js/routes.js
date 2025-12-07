@@ -29,7 +29,10 @@ window.populateRouteList = function (routeIds) {
         container.appendChild(btn);
     });
 
-    document.getElementById('route-list-section').style.display = routeIds.length ? 'block' : 'none';
+    const controlsSection = document.getElementById('route-list-controls');
+    if (controlsSection) {
+        controlsSection.style.display = routeIds.length ? 'block' : 'none';
+    }
 };
 
 window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
@@ -107,7 +110,7 @@ window.onRouteClick = function (routeId) {
     updateSelectionBadges();
 
     styleRoutesAndStopsForSelection();
-    populateStopList(routeId);
+    populateStopSelect(routeId);
 };
 
 window.styleRoutesAndStopsForSelection = function () {
@@ -175,3 +178,42 @@ function createDirectionArrow(start, end, color) {
         interactive: false,
     });
 }
+
+window.populateStopSelect = function (routeId) {
+    const select = document.getElementById('stop-select');
+    if (!select) return;
+    const routeEdges = window.routeEdgesCache[routeId] || [];
+    const stopsInPolygon = new Set((window.polygonStopMapping[String(window.selectedPolygonGid)] || []).map(String));
+    const stopsForRoute = new Set();
+    routeEdges.forEach(([a, b]) => {
+        if (stopsInPolygon.has(String(a))) stopsForRoute.add(String(a));
+        if (stopsInPolygon.has(String(b))) stopsForRoute.add(String(b));
+    });
+
+    select.innerHTML = '';
+    if (!stopsForRoute.size) {
+        select.disabled = true;
+        const opt = document.createElement('option');
+        opt.textContent = 'No stops for this route in area';
+        select.appendChild(opt);
+        return;
+    }
+
+    select.disabled = false;
+    const defaultOpt = document.createElement('option');
+    defaultOpt.textContent = 'Select a stop...';
+    defaultOpt.value = '';
+    select.appendChild(defaultOpt);
+
+    Array.from(stopsForRoute)
+        .sort()
+        .forEach((sid) => {
+            const meta = window.stopsMetadata[sid] || {};
+            const opt = document.createElement('option');
+            opt.value = sid;
+            opt.textContent = meta.name ? `${meta.name} (${sid})` : sid;
+            select.appendChild(opt);
+        });
+
+    select.value = '';
+};

@@ -28,6 +28,16 @@
                     <button id="selected-stop-btn" class="pill-button pill-button-compact" disabled>Stop: none</button>
                 </div>
                 <button id="clear-selection" type="button">Clear route selection</button>
+                <div id="route-list-controls" class="list-section" style="margin-top:8px;">
+                    <h3>Routes in selected area</h3>
+                    <div id="route-list" class="pill-list"></div>
+                </div>
+                <div class="list-section" style="margin-top:8px;">
+                    <label for="stop-select"><strong>Stops on selected route</strong></label>
+                    <select id="stop-select" disabled style="width:100%; margin-top:4px;">
+                        <option>Pick a route first</option>
+                    </select>
+                </div>
             </div>
 
             <div class="tab-content">
@@ -36,16 +46,6 @@
                         <h2>Area Delay Distribution</h2>
                         <canvas id="polygonHistogramChart"></canvas>
                     </div>
-                </div>
-
-                <div id="route-list-section" class="list-section" style="display: none;">
-                    <h3>Routes in selected area</h3>
-                    <div id="route-list" class="pill-list"></div>
-                </div>
-
-                <div id="stop-list-section" class="list-section" style="display: none;">
-                    <h3>Stops on selected route</h3>
-                    <div id="stop-list" class="pill-list"></div>
                 </div>
 
                 <div id="chart-area" class="chart-grid" style="display: none;">
