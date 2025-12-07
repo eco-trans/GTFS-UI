@@ -1,12 +1,20 @@
-﻿window.initMap = function () {
+window.initMap = function () {
     window.map = L.map('map').setView(window.SF_CENTER, 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+    window.baseLayerColor = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(window.map);
+    });
+    window.baseLayerGray = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors & Carto',
+    });
+    window.baseLayerColor.addTo(window.map);
+    window.currentBaseStyle = 'color';
 
     window.polygonsLayer = L.layerGroup().addTo(window.map);
     window.routesLayerGroup = L.layerGroup().addTo(window.map);
     window.stopsLayerGroup = L.layerGroup().addTo(window.map);
+
+    addMapControls();
 };
 
 window.loadMetadata = async function () {
@@ -61,5 +69,64 @@ window.loadMetadata = async function () {
     } catch (err) {
         console.error(err);
         setOverlayMessage('Error loading metadata. Please refresh.', true);
+    }
+};
+
+function addMapControls() {
+    const Control = L.Control.extend({
+        onAdd: function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar custom-map-controls');
+
+            const styleBtn = L.DomUtil.create('a', '', container);
+            styleBtn.href = '#';
+            styleBtn.title = 'Toggle base map style';
+            styleBtn.innerHTML = '🗺️';
+            styleBtn.onclick = (e) => {
+                L.DomEvent.stopPropagation(e);
+                L.DomEvent.preventDefault(e);
+                toggleBaseMapStyle();
+            };
+
+            const polyBtn = L.DomUtil.create('a', '', container);
+            polyBtn.href = '#';
+            polyBtn.title = 'Toggle polygons';
+            polyBtn.innerHTML = '⬚';
+            polyBtn.onclick = (e) => {
+                L.DomEvent.stopPropagation(e);
+                L.DomEvent.preventDefault(e);
+                togglePolygons();
+            };
+
+            return container;
+        },
+    });
+    window.map.addControl(new Control({ position: 'topleft' }));
+}
+
+window.toggleBaseMapStyle = function () {
+    if (!window.map || !window.baseLayerColor || !window.baseLayerGray) return;
+    if (window.currentBaseStyle === 'color') {
+        if (window.map.hasLayer(window.baseLayerColor)) window.map.removeLayer(window.baseLayerColor);
+        window.baseLayerGray.addTo(window.map);
+        window.currentBaseStyle = 'gray';
+    } else {
+        if (window.map.hasLayer(window.baseLayerGray)) window.map.removeLayer(window.baseLayerGray);
+        window.baseLayerColor.addTo(window.map);
+        window.currentBaseStyle = 'color';
+    }
+    const btn = document.getElementById('map-style-toggle');
+    if (btn) {
+        btn.textContent = window.currentBaseStyle === 'color' ? 'Switch to grayscale' : 'Switch to color';
+    }
+};
+
+window.togglePolygons = function () {
+    if (!window.map || !window.polygonsLayer) return;
+    if (window.polygonsVisible) {
+        window.map.removeLayer(window.polygonsLayer);
+        window.polygonsVisible = false;
+    } else {
+        window.polygonsLayer.addTo(window.map);
+        window.polygonsVisible = true;
     }
 };

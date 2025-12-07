@@ -12,6 +12,10 @@ window.ROUTE_DIR_STOP_DELAY_BASE = `${BASE_META_URL}/route_direction_stop_delay`
 window.SF_CENTER = [37.758458, -122.435435];
 
 window.map = null;
+window.baseLayerColor = null;
+window.baseLayerGray = null;
+window.currentBaseStyle = 'color';
+window.polygonsVisible = true;
 window.polygonsLayer = null;
 window.routesLayerGroup = null;
 window.stopsLayerGroup = null;
