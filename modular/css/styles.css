@@ -180,6 +180,16 @@ body {
     border-color: #2980b9;
 }
 
+.pill-button-compact {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+}
+
+.pill-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 .custom-map-controls a {
     width: 30px;
     height: 30px;
