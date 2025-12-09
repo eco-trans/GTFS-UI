@@ -24,6 +24,7 @@ window.populateRouteList = function (routeIds) {
         const label = meta.name || rid;
         const btn = document.createElement('button');
         btn.className = 'pill-button';
+        btn.dataset.routeId = rid;
         btn.textContent = label;
         btn.onclick = () => onRouteClick(rid);
         container.appendChild(btn);
@@ -119,6 +120,7 @@ window.onRouteClick = async function (routeId) {
     styleRoutesAndStopsForSelection();
     await populateStopSelect(routeId);
     showStopListSection(true);
+    updateRouteListSelection();
 };
 
 window.styleRoutesAndStopsForSelection = function () {
@@ -243,3 +245,15 @@ window.populateStopSelect = async function (routeId) {
 
     select.value = '';
 };
+
+function updateRouteListSelection() {
+    const buttons = document.querySelectorAll('#route-list .pill-button');
+    buttons.forEach((btn) => {
+        const rid = btn.dataset.routeId;
+        if (window.selectedRouteId && rid === String(window.selectedRouteId)) {
+            btn.classList.add('selected');
+        } else {
+            btn.classList.remove('selected');
+        }
+    });
+}

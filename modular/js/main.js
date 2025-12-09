@@ -1,31 +1,35 @@
 function updateSelectionBadges() {
     const polyLabel = document.getElementById('selected-polygon-label');
-    const routeBtn = document.getElementById('selected-route-btn');
-    const stopBtn = document.getElementById('selected-stop-btn');
+    const routeText = document.getElementById('selected-route-text');
+    const stopText = document.getElementById('selected-stop-text');
+    const routeInfoBtn = document.getElementById('route-info-btn');
+    const stopInfoBtn = document.getElementById('stop-info-btn');
 
     if (polyLabel) polyLabel.textContent = window.selectedPolygonGid ? `Area: ${window.selectedPolygonGid}` : 'Area: none';
-    if (routeBtn) {
-        const meta = window.routesMetadata[window.selectedRouteId] || {};
-        const routeName = meta.name || window.selectedRouteId || 'none';
-        routeBtn.textContent = `Route: ${routeName || 'none'}`;
-        if (meta.link) {
-            routeBtn.disabled = false;
-            routeBtn.onclick = () => window.open(meta.link, '_blank');
+    const routeMeta = window.routesMetadata[window.selectedRouteId] || {};
+    const stopMeta = window.stopsMetadata[window.selectedStopId] || {};
+    const routeName = routeMeta.name || window.selectedRouteId || 'none';
+    const stopName = stopMeta.name || window.selectedStopId || 'none';
+
+    if (routeText) routeText.textContent = `Route: ${routeName || 'none'}`;
+    if (stopText) stopText.textContent = `Stop: ${stopName || 'none'}`;
+
+    if (routeInfoBtn) {
+        if (routeMeta.link) {
+            routeInfoBtn.disabled = false;
+            routeInfoBtn.onclick = () => window.open(routeMeta.link, '_blank');
         } else {
-            routeBtn.disabled = true;
-            routeBtn.onclick = null;
+            routeInfoBtn.disabled = true;
+            routeInfoBtn.onclick = null;
         }
     }
-    if (stopBtn) {
-        const meta = window.stopsMetadata[window.selectedStopId] || {};
-        const stopName = meta.name || window.selectedStopId || 'none';
-        stopBtn.textContent = `Stop: ${stopName || 'none'}`;
-        if (meta.link) {
-            stopBtn.disabled = false;
-            stopBtn.onclick = () => window.open(meta.link, '_blank');
+    if (stopInfoBtn) {
+        if (stopMeta.link) {
+            stopInfoBtn.disabled = false;
+            stopInfoBtn.onclick = () => window.open(stopMeta.link, '_blank');
         } else {
-            stopBtn.disabled = true;
-            stopBtn.onclick = null;
+            stopInfoBtn.disabled = true;
+            stopInfoBtn.onclick = null;
         }
     }
 }
@@ -70,6 +74,10 @@ window.clearRouteSelection = function () {
 
     if (window.polygonsLayer && !window.map.hasLayer(window.polygonsLayer)) {
         window.polygonsLayer.addTo(window.map);
+    }
+
+    if (typeof updateRouteListSelection === 'function') {
+        updateRouteListSelection();
     }
 };
 

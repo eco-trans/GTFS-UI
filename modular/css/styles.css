@@ -197,6 +197,33 @@ body {
     background: #fff;
 }
 
+.danger-button {
+    align-self: flex-start;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid #e74c3c;
+    background: #fcebea;
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.danger-button:hover {
+    background: #f8d7da;
+}
+
+.header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 3px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 6px;
+}
+
 .custom-map-controls a {
     width: 30px;
     height: 30px;
@@ -208,7 +235,6 @@ body {
     background: #fff;
 }
 
-@media (max-width: 1024px) {
 .route-arrow {
     position: relative;
     width: 18px;

@@ -24,12 +24,18 @@
                 <!-- <p></p> -->
                 <div class="status-line">
                     <span id="selected-polygon-label" class="status-pill">Area: none</span>
-                    <button id="selected-route-btn" class="pill-button pill-button-compact" disabled>Route: none</button>
-                    <button id="selected-stop-btn" class="pill-button pill-button-compact" disabled>Stop: none</button>
+                    <!-- <span id="selected-route-text" class="status-pill">Route: none</span>
+                    <span id="selected-stop-text" class="status-pill">Stop: none</span> -->
                 </div>
-                <button id="clear-selection" type="button">Clear route selection</button>
+                <button id="clear-selection" class="danger-button" type="button">Reset</button>
                 <div id="route-list-controls" class="list-section" style="margin-top:8px; display: none;">
-                    <h3>Routes in selected area</h3>
+                    <div class="header-row">
+                        <h3>Routes in selected area</h3>
+                        <div class="header-actions">
+                            <button id="route-info-btn" class="pill-button pill-button-compact" disabled>Route info</button>
+                            <button id="stop-info-btn" class="pill-button pill-button-compact" disabled>Stop info</button>
+                        </div>
+                    </div>
                     <div id="route-list" class="pill-list"></div>
                 </div>
                 <div id="stop-select-container" class="list-section" style="margin-top:8px; display: none;">
