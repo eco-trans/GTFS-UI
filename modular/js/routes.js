@@ -111,13 +111,13 @@ window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
     }
 };
 
-window.onRouteClick = function (routeId) {
+window.onRouteClick = async function (routeId) {
     window.selectedRouteId = routeId;
     window.selectedStopId = null;
     updateSelectionBadges();
 
     styleRoutesAndStopsForSelection();
-    populateStopSelect(routeId);
+    await populateStopSelect(routeId);
     showStopListSection(true);
 };
 
@@ -187,16 +187,34 @@ function createDirectionArrow(start, end, color) {
     });
 }
 
-window.populateStopSelect = function (routeId) {
+window.populateStopSelect = async function (routeId) {
     const select = document.getElementById('stop-select');
     if (!select) return;
-    const routeEdges = window.routeEdgesCache[routeId] || [];
-    const stopsInPolygon = new Set((window.polygonStopMapping[String(window.selectedPolygonGid)] || []).map(String));
     const stopsForRoute = new Set();
+
+    // Primary source: route_edges to collect all stops on this route.
+    if (!window.routeEdgesCache[routeId]) {
+        window.routeEdgesCache[routeId] = await safeFetchJson(`${window.ROUTE_EDGES_BASE}/${routeId}.json`);
+    }
+    const routeEdges = window.routeEdgesCache[routeId] || [];
     routeEdges.forEach(([a, b]) => {
-        if (stopsInPolygon.has(String(a))) stopsForRoute.add(String(a));
-        if (stopsInPolygon.has(String(b))) stopsForRoute.add(String(b));
+        if (a) stopsForRoute.add(String(a));
+        if (b) stopsForRoute.add(String(b));
     });
+
+    // Fallback/augment: if polygon selection exists, include any stops in polygon that map to this route.
+    const stopsInPolygon = new Set((window.polygonStopMapping[String(window.selectedPolygonGid)] || []).map(String));
+    await Promise.all(
+        Array.from(stopsInPolygon).map(async (sid) => {
+            if (!window.stopRouteMappingCache[sid]) {
+                window.stopRouteMappingCache[sid] = await safeFetchJson(`${window.STOP_ROUTE_MAPPING_BASE}/${sid}.json`);
+            }
+            const routesForStop = window.stopRouteMappingCache[sid];
+            if (Array.isArray(routesForStop) && routesForStop.includes(routeId)) {
+                stopsForRoute.add(sid);
+            }
+        })
+    );
 
     select.innerHTML = '';
     if (!stopsForRoute.size) {
