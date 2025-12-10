@@ -20,16 +20,17 @@ window.initMap = function () {
 window.loadMetadata = async function () {
     setOverlayMessage('Loading metadata...');
     try {
-        const [stopLoc, routesMeta, stopsMeta, polys, polyStops, spatial] = await Promise.all([
+        const [stopLoc, routesMeta, stopsMeta, polys, polyStops, spatial, stopRouteDelayAvg] = await Promise.all([
             safeFetchJson(window.STOP_LOCATION_URL),
             safeFetchJson(window.ROUTES_METADATA_URL),
             safeFetchJson(window.STOPS_METADATA_URL),
             safeFetchJson(window.POLYGONS_URL),
             safeFetchJson(window.POLYGON_STOP_MAPPING_URL),
             safeFetchJson(window.SPATIAL_DELAY_URL),
+            safeFetchJson(window.STOP_ROUTE_DELAY_AVG_URL),
         ]);
 
-        if (!stopLoc || !routesMeta || !stopsMeta || !polys || !polyStops || !spatial) {
+        if (!stopLoc || !routesMeta || !stopsMeta || !polys || !polyStops || !spatial || !stopRouteDelayAvg) {
             throw new Error('One or more metadata files failed to load');
         }
 
@@ -39,6 +40,7 @@ window.loadMetadata = async function () {
         window.polygonsGeoJson = polys;
         window.polygonStopMapping = polyStops;
         window.spatialDelayData = spatial;
+        window.stopRouteDelayAvg = stopRouteDelayAvg;
 
         const means = [];
         window.polygonMeanDelays = {};

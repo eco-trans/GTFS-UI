@@ -9,6 +9,7 @@ window.SPATIAL_DELAY_URL = `${BASE_META_URL}/spatial_delay_data.json`;
 window.STOP_ROUTE_MAPPING_BASE = `${BASE_META_URL}/stop_route_mapping`;
 window.ROUTE_EDGES_BASE = `${BASE_META_URL}/route_edges`;
 window.ROUTE_DIR_STOP_DELAY_BASE = `${BASE_META_URL}/route_direction_stop_delay`;
+window.STOP_ROUTE_DELAY_AVG_URL = `${BASE_META_URL}/stop_route_delay_avg.json`;
 window.SF_CENTER = [37.758458, -122.435435];
 
 window.map = null;
@@ -26,6 +27,7 @@ window.stopsMetadata = {};
 window.polygonsGeoJson = null;
 window.polygonStopMapping = {};
 window.spatialDelayData = {};
+window.stopRouteDelayAvg = {};
 
 window.polygonMeanDelays = {};
 window.polygonMinMean = null;
@@ -37,6 +39,7 @@ window.routeEdgesCache = {};
 window.routeLayerIndex = {};
 window.routeArrowIndex = {};
 window.stopMarkerIndex = {};
+window.currentRoutesInView = [];
 
 window.selectedPolygonGid = null;
 window.selectedRouteId = null;

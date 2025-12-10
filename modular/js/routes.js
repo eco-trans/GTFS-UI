@@ -50,6 +50,7 @@ window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
     window.routeLayerIndex = {};
     window.routeArrowIndex = {};
     window.stopMarkerIndex = {};
+    window.currentRoutesInView = routeIds.slice();
 
     const bounds = [];
 
@@ -110,6 +111,8 @@ window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
     if (window.stopsLayerGroup.bringToFront) {
         window.stopsLayerGroup.bringToFront();
     }
+
+    styleRoutesAndStopsForSelection();
 };
 
 window.onRouteClick = async function (routeId) {
@@ -124,6 +127,9 @@ window.onRouteClick = async function (routeId) {
 };
 
 window.styleRoutesAndStopsForSelection = function () {
+    const activeRouteSet = window.selectedRouteId ? [String(window.selectedRouteId)] : window.currentRoutesInView.map(String);
+    const stopDelayRange = computeStopDelayRange(activeRouteSet);
+
     Object.keys(window.routeLayerIndex).forEach((rid) => {
         const meta = window.routesMetadata[rid] || {};
         const baseColor = meta.color ? `#${meta.color}` : '#2980b9';
@@ -151,11 +157,13 @@ window.styleRoutesAndStopsForSelection = function () {
         const entry = window.stopMarkerIndex[sid];
         const isOnSelected = !window.selectedRouteId || entry.routes.has(window.selectedRouteId);
         const isSelectedStop = window.selectedStopId === sid;
+        const delayColor = getStopDelayColor(sid, activeRouteSet, stopDelayRange);
+        const baseFill = delayColor || '#3498db';
         entry.marker.setStyle({
             radius: isSelectedStop ? 11 : isOnSelected ? 9 : 6,
             fillOpacity: isSelectedStop ? 0.95 : isOnSelected ? 0.9 : 0.6,
             color: isSelectedStop ? '#e74c3c' : isOnSelected ? '#34495e' : '#bdc3c7',
-            fillColor: isSelectedStop ? '#e74c3c' : isOnSelected ? '#3498db' : '#ecf0f1',
+            fillColor: isSelectedStop ? '#e74c3c' : isOnSelected ? baseFill : '#ecf0f1',
             weight: isSelectedStop ? 1 : isOnSelected ? 0.6 : 0,
         });
         if (entry.marker.bringToFront) entry.marker.bringToFront();
@@ -256,4 +264,47 @@ function updateRouteListSelection() {
             btn.classList.remove('selected');
         }
     });
+}
+
+function computeStopDelayRange(routeIds) {
+    const vals = [];
+    if (!routeIds || !routeIds.length) return { min: null, max: null };
+    const routeSet = new Set(routeIds.map(String));
+    Object.keys(window.stopMarkerIndex).forEach((sid) => {
+        const stopEntry = window.stopRouteDelayAvg[sid];
+        if (!stopEntry) return;
+        Object.entries(stopEntry).forEach(([rid, v]) => {
+            if (!routeSet.has(String(rid))) return;
+            if (typeof v === 'number') {
+                vals.push(-1 * v);
+            }
+        });
+    });
+    if (!vals.length) return { min: null, max: null };
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+}
+
+function getStopDelayColor(stopId, routeIds, range) {
+    if (!routeIds || !routeIds.length || !range || range.min == null || range.max == null) return null;
+    const stopEntry = window.stopRouteDelayAvg[stopId];
+    if (!stopEntry) return null;
+    const routeSet = new Set(routeIds.map(String));
+    const vals = [];
+    Object.entries(stopEntry).forEach(([rid, v]) => {
+        if (!routeSet.has(String(rid))) return;
+        if (typeof v === 'number') vals.push(-1 * v);
+    });
+    if (!vals.length) return null;
+    const val = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (val - range.min) / (range.max - range.min)));
+    return redsGradient(t);
+}
+
+function redsGradient(t) {
+    const c1 = [255, 245, 235]; // light
+    const c2 = [203, 24, 29]; // dark
+    const r = Math.round(c1[0] + t * (c2[0] - c1[0]));
+    const g = Math.round(c1[1] + t * (c2[1] - c1[1]));
+    const b = Math.round(c1[2] + t * (c2[2] - c1[2]));
+    return `rgb(${r},${g},${b})`;
 }

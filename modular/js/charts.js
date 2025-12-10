@@ -49,8 +49,13 @@ function renderChartsForDirection(samples, hourlyCanvasId, dailyCanvasId, hourly
         return;
     }
 
-    const hourly = aggregateByHour(samples);
-    const daily = aggregateByDay(samples);
+    const clippedSamples = samples.map(({ t, delay }) => ({
+        t,
+        delay: Math.max(-2000, Math.min(2000, delay)),
+    }));
+
+    const hourly = aggregateByHour(clippedSamples);
+    const daily = aggregateByDay(clippedSamples);
 
     hourlyContainer.style.display = 'block';
     dailyContainer.style.display = 'block';
@@ -99,8 +104,10 @@ function renderLineChartWithBand(canvasId, labels, seriesVals, bandVals, label) 
     const lower = seriesVals.map((v, i) => (v != null && bandVals[i] != null ? v - bandVals[i] : null));
 
     const validVals = seriesVals.filter((v) => v != null && isFinite(v));
-    const yMin = validVals.length ? Math.min(...validVals) : undefined;
-    const yMax = validVals.length ? Math.max(...validVals) : undefined;
+    let yMin = validVals.length ? Math.min(...validVals) : undefined;
+    let yMax = validVals.length ? Math.max(...validVals) : undefined;
+    if (yMin != null && yMin < -2000) yMin = -2000;
+    if (yMax != null && yMax > 2000) yMax = 2000;
 
     return new Chart(ctx, {
         type: 'line',
