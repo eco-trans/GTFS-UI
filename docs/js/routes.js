@@ -79,16 +79,26 @@ window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
                 color,
                 weight: hasReverse ? 4 : 3,
                 opacity: 0.9,
+                pane: 'routesPane',
             }).on('click', (e) => {
                 L.DomEvent.stopPropagation(e);
                 onRouteClick(routeId);
             });
 
             if (hasReverse) {
-                line.bindTooltip('Two-way connection', { sticky: true });
+                const label = meta.name || `Route ${routeId}`;
+                line.bindTooltip(`<strong>${label}</strong><br>Route ID: ${routeId} (Two-way)`, {
+                    sticky: true,
+                    direction: 'auto',
+                    opacity: 0.95,
+                });
             } else {
                 const label = meta.name || `Route ${routeId}`;
-                line.bindTooltip(label, { sticky: true });
+                line.bindTooltip(`<strong>${label}</strong><br>Route ID: ${routeId}`, {
+                    sticky: true,
+                    direction: 'auto',
+                    opacity: 0.95,
+                });
             }
 
             window.routesLayerGroup.addLayer(line);
@@ -102,10 +112,6 @@ window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
             ensureStopMarker(String(from), start, routeId);
             ensureStopMarker(String(to), end, routeId);
         });
-    }
-
-    if (bounds.length > 0) {
-        window.map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40] });
     }
 
     if (window.stopsLayerGroup.bringToFront) {
@@ -194,6 +200,7 @@ function createDirectionArrow(start, end, color) {
         weight: 1.5,
         opacity: 0.9,
         interactive: false,
+        pane: 'routesPane',
     });
 }
 

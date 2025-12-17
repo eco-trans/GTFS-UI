@@ -8,6 +8,7 @@ window.ensureStopMarker = function (stopId, coord, routeId) {
             weight: 0.4,
             fillColor: '#3498db',
             fillOpacity: 0.8,
+            pane: 'stopsPane',
         }).on('click', (e) => {
             L.DomEvent.stopPropagation(e);
             if (window.selectedRouteId) {
@@ -27,5 +28,13 @@ window.onStopClick = function (stopId) {
     window.selectedStopId = stopId;
     updateSelectionBadges();
     renderCharts(window.selectedRouteId, stopId);
+    const stopSelect = document.getElementById('stop-select');
+    if (stopSelect) {
+        const target = String(stopId);
+        const hasOption = Array.from(stopSelect.options).some((opt) => opt.value === target);
+        if (hasOption) {
+            stopSelect.value = target;
+        }
+    }
     styleRoutesAndStopsForSelection();
 };

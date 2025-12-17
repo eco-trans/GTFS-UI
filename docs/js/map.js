@@ -7,12 +7,23 @@ window.initMap = function () {
     window.baseLayerGray = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors & Carto',
     });
-    window.baseLayerColor.addTo(window.map);
-    window.currentBaseStyle = 'color';
+    // window.baseLayerColor.addTo(window.map);
+    // window.currentBaseStyle = 'color';
 
-    window.polygonsLayer = L.layerGroup().addTo(window.map);
-    window.routesLayerGroup = L.layerGroup().addTo(window.map);
-    window.stopsLayerGroup = L.layerGroup().addTo(window.map);
+    window.baseLayerGray.addTo(window.map);
+    window.currentBaseStyle = 'gray';
+
+    // Layer ordering: tiles (bottom) -> polygons -> routes -> stops (top)
+    window.map.createPane('polygonsPane');
+    window.map.createPane('routesPane');
+    window.map.createPane('stopsPane');
+    window.map.getPane('polygonsPane').style.zIndex = 400;
+    window.map.getPane('routesPane').style.zIndex = 450;
+    window.map.getPane('stopsPane').style.zIndex = 500;
+
+    window.polygonsLayer = L.layerGroup([], { pane: 'polygonsPane' }).addTo(window.map);
+    window.routesLayerGroup = L.layerGroup([], { pane: 'routesPane' }).addTo(window.map);
+    window.stopsLayerGroup = L.layerGroup([], { pane: 'stopsPane' }).addTo(window.map);
 
     addMapControls();
 };

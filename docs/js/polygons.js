@@ -22,6 +22,7 @@ window.initPolygonsLayer = function () {
     }
 
     window.polygonsLayer = L.geoJSON(window.polygonsGeoJson, {
+        pane: 'polygonsPane',
         style: (feature) => {
             const gid = feature?.properties?.gid != null ? String(feature.properties.gid) : null;
             const meanVal = gid && window.polygonMeanDelays[gid] != null ? window.polygonMeanDelays[gid] : null;
@@ -84,6 +85,7 @@ window.showPolygonHistogram = function (gid) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             scales: {
                 x: { title: { display: true, text: 'Delay (sec)' } },
                 y: { title: { display: true, text: 'Count' } },
