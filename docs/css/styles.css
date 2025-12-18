@@ -235,6 +235,11 @@ body {
     background: #fff;
 }
 
+.map-legend {
+    font-size: 0.82rem;
+    color: #2c3e50;
+}
+
 .route-arrow {
     position: relative;
     width: 18px;

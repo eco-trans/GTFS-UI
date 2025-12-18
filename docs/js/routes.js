@@ -135,10 +135,17 @@ window.onRouteClick = async function (routeId) {
 window.styleRoutesAndStopsForSelection = function () {
     const activeRouteSet = window.selectedRouteId ? [String(window.selectedRouteId)] : window.currentRoutesInView.map(String);
     const stopDelayRange = computeStopDelayRange(activeRouteSet);
+    const stopOtpRange = computeStopOtpRange(activeRouteSet);
+    const routeOtpRange = computeRouteOtpRange(window.currentRoutesInView);
 
     Object.keys(window.routeLayerIndex).forEach((rid) => {
         const meta = window.routesMetadata[rid] || {};
-        const baseColor = meta.color ? `#${meta.color}` : '#2980b9';
+        const baseColor =
+            window.colorMode === 'otp'
+                ? getRouteOtpColor(rid, routeOtpRange)
+                : meta.color
+                ? `#${meta.color}`
+                : '#2980b9';
         const isSelected = window.selectedRouteId === rid;
         const opacity = isSelected || !window.selectedRouteId ? 0.95 : 0.7;
         const dimColor = '#bdc3c7';
@@ -163,8 +170,11 @@ window.styleRoutesAndStopsForSelection = function () {
         const entry = window.stopMarkerIndex[sid];
         const isOnSelected = !window.selectedRouteId || entry.routes.has(window.selectedRouteId);
         const isSelectedStop = window.selectedStopId === sid;
-        const delayColor = getStopDelayColor(sid, activeRouteSet, stopDelayRange);
-        const baseFill = delayColor || '#3498db';
+        const colorVal =
+            window.colorMode === 'otp'
+                ? getStopOtpColor(sid, activeRouteSet, stopOtpRange)
+                : getStopDelayColor(sid, activeRouteSet, stopDelayRange);
+        const baseFill = colorVal || '#3498db';
         entry.marker.setStyle({
             radius: isSelectedStop ? 11 : isOnSelected ? 9 : 6,
             fillOpacity: isSelectedStop ? 0.95 : isOnSelected ? 0.9 : 0.6,
@@ -275,41 +285,148 @@ function updateRouteListSelection() {
 
 function computeStopDelayRange(routeIds) {
     const vals = [];
-    if (!routeIds || !routeIds.length) return { min: null, max: null };
-    const routeSet = new Set(routeIds.map(String));
-    Object.keys(window.stopMarkerIndex).forEach((sid) => {
-        const stopEntry = window.stopRouteDelayAvg[sid];
-        if (!stopEntry) return;
-        Object.entries(stopEntry).forEach(([rid, v]) => {
-            if (!routeSet.has(String(rid))) return;
-            if (typeof v === 'number') {
-                vals.push(-1 * v);
-            }
+    const stopIds = Object.keys(window.stopMarkerIndex || {});
+
+    // When a route is selected, use per-route averages; otherwise use stop-level averages.
+    if (window.selectedRouteId && routeIds && routeIds.length) {
+        const routeSet = new Set(routeIds.map(String));
+        stopIds.forEach((sid) => {
+            const stopEntry = window.stopRouteDelayAvg[sid];
+            if (!stopEntry) return;
+            Object.entries(stopEntry).forEach(([rid, v]) => {
+                if (!routeSet.has(String(rid))) return;
+                if (typeof v === 'number') vals.push(-1 * v);
+            });
         });
-    });
+    } else {
+        stopIds.forEach((sid) => {
+            const v = window.stopDelayAvg ? window.stopDelayAvg[sid] : null;
+            if (typeof v === 'number') vals.push(-1 * v);
+        });
+    }
+
     if (!vals.length) return { min: null, max: null };
     return { min: Math.min(...vals), max: Math.max(...vals) };
 }
 
 function getStopDelayColor(stopId, routeIds, range) {
-    if (!routeIds || !routeIds.length || !range || range.min == null || range.max == null) return null;
-    const stopEntry = window.stopRouteDelayAvg[stopId];
-    if (!stopEntry) return null;
-    const routeSet = new Set(routeIds.map(String));
-    const vals = [];
-    Object.entries(stopEntry).forEach(([rid, v]) => {
-        if (!routeSet.has(String(rid))) return;
-        if (typeof v === 'number') vals.push(-1 * v);
-    });
-    if (!vals.length) return null;
-    const val = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (!range || range.min == null || range.max == null) return null;
+    let val = null;
+
+    if (window.selectedRouteId && routeIds && routeIds.length) {
+        const stopEntry = window.stopRouteDelayAvg[stopId];
+        if (!stopEntry) return null;
+        const routeSet = new Set(routeIds.map(String));
+        const vals = [];
+        Object.entries(stopEntry).forEach(([rid, v]) => {
+            if (!routeSet.has(String(rid))) return;
+            if (typeof v === 'number') vals.push(-1 * v);
+        });
+        if (!vals.length) return null;
+        val = vals.reduce((a, b) => a + b, 0) / vals.length;
+    } else {
+        const v = window.stopDelayAvg ? window.stopDelayAvg[stopId] : null;
+        if (typeof v !== 'number') return null;
+        val = -1 * v;
+    }
+
+    if (val == null) return null;
     const t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (val - range.min) / (range.max - range.min)));
     return redsGradient(t);
+}
+
+function computeStopOtpRange(routeIds) {
+    const vals = [];
+    const stopIds = Object.keys(window.stopMarkerIndex || {});
+
+    if (window.selectedRouteId && routeIds && routeIds.length) {
+        const routeSet = new Set(routeIds.map(String));
+        stopIds.forEach((sid) => {
+            const stopEntry = window.stopRouteOtp[sid];
+            if (!stopEntry) return;
+            Object.entries(stopEntry).forEach(([rid, v]) => {
+                if (!routeSet.has(String(rid))) return;
+                if (typeof v === 'number') vals.push(v);
+            });
+        });
+    } else {
+        stopIds.forEach((sid) => {
+            const v = window.stopOtp ? window.stopOtp[sid] : null;
+            if (typeof v === 'number') vals.push(v);
+        });
+    }
+
+    if (!vals.length) return { min: null, max: null };
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+}
+
+function getStopOtpColor(stopId, routeIds, range) {
+    if (!range || range.min == null || range.max == null) return null;
+    let val = null;
+
+    if (window.selectedRouteId && routeIds && routeIds.length) {
+        const stopEntry = window.stopRouteOtp[stopId];
+        if (!stopEntry) return null;
+        const routeSet = new Set(routeIds.map(String));
+        const vals = [];
+        Object.entries(stopEntry).forEach(([rid, v]) => {
+            if (!routeSet.has(String(rid))) return;
+            if (typeof v === 'number') vals.push(v);
+        });
+        if (!vals.length) return null;
+        val = vals.reduce((a, b) => a + b, 0) / vals.length;
+    } else {
+        const v = window.stopOtp ? window.stopOtp[stopId] : null;
+        if (typeof v !== 'number') return null;
+        val = v;
+    }
+
+    const t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (val - range.min) / (range.max - range.min)));
+    return bluesGradient(t);
+}
+
+function computeRouteOtpRange(routeIds) {
+    if (!routeIds || !routeIds.length) return { min: null, max: null };
+    const vals = [];
+    routeIds.forEach((rid) => {
+        const v = routeOtpMean(rid);
+        if (v != null) vals.push(v);
+    });
+    if (!vals.length) return { min: null, max: null };
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+}
+
+function routeOtpMean(routeId) {
+    const stops = Object.keys(window.stopMarkerIndex || {});
+    const vals = [];
+    stops.forEach((sid) => {
+        const entry = window.stopRouteOtp[sid];
+        if (entry && typeof entry[routeId] === 'number') vals.push(entry[routeId]);
+    });
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function getRouteOtpColor(routeId, range) {
+    if (!range || range.min == null || range.max == null) return '#2980b9';
+    const val = routeOtpMean(routeId);
+    if (val == null) return '#2980b9';
+    const t = range.max === range.min ? 0.5 : Math.max(0, Math.min(1, (val - range.min) / (range.max - range.min)));
+    return bluesGradient(t);
 }
 
 function redsGradient(t) {
     const c1 = [255, 245, 235]; // light
     const c2 = [203, 24, 29]; // dark
+    const r = Math.round(c1[0] + t * (c2[0] - c1[0]));
+    const g = Math.round(c1[1] + t * (c2[1] - c1[1]));
+    const b = Math.round(c1[2] + t * (c2[2] - c1[2]));
+    return `rgb(${r},${g},${b})`;
+}
+
+function bluesGradient(t) {
+    const c1 = [239, 243, 255]; // light blue
+    const c2 = [8, 81, 156]; // dark blue
     const r = Math.round(c1[0] + t * (c2[0] - c1[0]));
     const g = Math.round(c1[1] + t * (c2[1] - c1[1]));
     const b = Math.round(c1[2] + t * (c2[2] - c1[2]));

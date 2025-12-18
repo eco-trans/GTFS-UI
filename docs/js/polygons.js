@@ -1,4 +1,15 @@
-﻿window.colorForPolygonMean = function (meanVal) {
+window.colorForPolygonMean = function (gid) {
+    if (window.colorMode === 'otp') {
+        const val = window.polygonOtpMean[gid];
+        if (val == null || window.polygonOtpMin == null || window.polygonOtpMax == null) return '#d7dde5';
+        const min = window.polygonOtpMin;
+        const max = window.polygonOtpMax;
+        const span = max - min || 1;
+        let t = (val - min) / span;
+        t = Math.max(0, Math.min(1, t));
+        return bluesGradient(t);
+    }
+    const meanVal = window.polygonMeanDelays[gid];
     if (meanVal == null || window.polygonMinMean == null || window.polygonMaxMean == null) {
         return '#d7dde5';
     }
@@ -25,11 +36,10 @@ window.initPolygonsLayer = function () {
         pane: 'polygonsPane',
         style: (feature) => {
             const gid = feature?.properties?.gid != null ? String(feature.properties.gid) : null;
-            const meanVal = gid && window.polygonMeanDelays[gid] != null ? window.polygonMeanDelays[gid] : null;
             return {
                 color: '#666',
                 weight: 1,
-                fillColor: colorForPolygonMean(meanVal),
+                fillColor: gid ? colorForPolygonMean(gid) : '#d7dde5',
                 fillOpacity: 0.55,
             };
         },
@@ -150,3 +160,12 @@ window.onPolygonClick = async function (gid) {
     populateRouteList(routeIds);
     await drawRoutesAndStopsFromPolygon(stopIds, routeIds);
 };
+
+function bluesGradient(t) {
+    const c1 = [239, 243, 255]; // light blue
+    const c2 = [8, 81, 156]; // dark blue
+    const r = Math.round(c1[0] + t * (c2[0] - c1[0]));
+    const g = Math.round(c1[1] + t * (c2[1] - c1[1]));
+    const b = Math.round(c1[2] + t * (c2[2] - c1[2]));
+    return `rgb(${r},${g},${b})`;
+}
