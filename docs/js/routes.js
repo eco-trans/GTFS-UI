@@ -25,7 +25,7 @@ window.populateRouteList = function (routeIds) {
         const btn = document.createElement('button');
         btn.className = 'pill-button';
         btn.dataset.routeId = rid;
-        btn.textContent = label;
+        btn.textContent = rid + " " + label;
         btn.onclick = () => onRouteClick(rid);
         container.appendChild(btn);
     });
@@ -87,14 +87,14 @@ window.drawRoutesAndStopsFromPolygon = async function (stopIds, routeIds) {
 
             if (hasReverse) {
                 const label = meta.name || `Route ${routeId}`;
-                line.bindTooltip(`<strong>${label}</strong><br>Route ID: ${routeId} (Two-way)`, {
+                line.bindTooltip(`<strong>${routeId} ${label}</strong><br>(Two-way)`, {
                     sticky: true,
                     direction: 'auto',
                     opacity: 0.95,
                 });
             } else {
                 const label = meta.name || `Route ${routeId}`;
-                line.bindTooltip(`<strong>${label}</strong><br>Route ID: ${routeId}`, {
+                line.bindTooltip(`<strong>${routeId} ${label}</strong>`, {
                     sticky: true,
                     direction: 'auto',
                     opacity: 0.95,
