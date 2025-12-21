@@ -25,7 +25,7 @@ logging.basicConfig(
         filemode='a'
     )
 
-logging.info(f"Pipeline ran")
+# logging.info(f"Pipeline ran")
 
 def make_writable(func, path, exc_info):
     os.chmod(path, stat.S_IWRITE)
