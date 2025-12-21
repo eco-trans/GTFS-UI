@@ -4,9 +4,9 @@ window.ensureStopMarker = function (stopId, coord, routeId) {
         const meta = window.stopsMetadata[stopId] || {};
         const marker = L.circleMarker([lat, lon], {
             radius: 6,
-            color: '#34495e',
+            color: 'rgba(255, 255, 255, 0)',
             weight: 0.4,
-            fillColor: '#3498db',
+            fillColor: 'rgba(255, 255, 255, 0)',
             fillOpacity: 0.8,
             pane: 'stopsPane',
         }).on('click', (e) => {
