@@ -1,1 +1,0 @@
-' CreateObject("Wscript.Shell").Run chr(34) & "C:\Users\muk0003\OneDrive - Auburn University\Desktop\Realtime-Transit-Database\tasks\seek_schedules.bat" & chr(34), 0, True

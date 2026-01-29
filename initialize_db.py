@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
+
 def get_connection():
     load_dotenv()
     database_url = os.getenv("DATABASE_URL")
@@ -10,6 +11,7 @@ def get_connection():
     client = MongoClient(database_url)
     db = client[metadata_db_name]
     return client, db
+
 
 async def get_async_connection():
     load_dotenv()
@@ -20,13 +22,16 @@ async def get_async_connection():
     db = client[metadata_db_name]
     return client, db
 
+
 def get_sch_db_name(document):
     region = document["region"]
     return region.strip().replace(" ", "_").lower() + "__" + "schedule"
 
-def get_rt_db_name(document):
+
+def get_rt_db_name(document, var_name):
     region = document["region"]
-    return region.strip().replace(" ", "_").lower() + "__" + "realtime"
+    return region.strip().replace(" ", "_").lower() + "__" + var_name
+
 
 def ini_db():
     client, db = get_connection()
@@ -34,13 +39,14 @@ def ini_db():
     ts_cursor = db[transit_systems_collection]
 
     for document in ts_cursor.find({}):
-        for n_db_name in [get_sch_db_name(document), get_rt_db_name(document)]:
+        for n_db_name in [get_sch_db_name(document)] + [get_rt_db_name(document, var_name) for var_name in os.getenv("RT_VARS").split(",")]:
             if n_db_name not in client.list_database_names():
                 n_db = client[n_db_name]
                 dummy_collection = n_db["NA"]
                 dummy_collection.insert_one({"NA": "NA"})
 
     client.close()
+
 
 def remove_ts_prec_frorm_collections():
     client, db = get_connection()
@@ -56,9 +62,10 @@ def remove_ts_prec_frorm_collections():
                     name_parts = list(collection_name.split("__"))
                     name_parts[0] = name_parts[0].split(".")[0]
                     print(collection_name, ">>", "__".join(name_parts))
-                    collection.rename("__".join(name_parts), dropTarget=False) 
-                    
+                    collection.rename("__".join(name_parts), dropTarget=False)
+
     client.close()
+
 
 def create_index_in_trip_updates():
     client, db = get_connection()
@@ -72,8 +79,9 @@ def create_index_in_trip_updates():
                 if "trip_update" in collection_name:
                     collection = n_db[collection_name]
                     collection.create_index([("trip__trip_id", 1)])
-                
+
     client.close()
+
 
 def delete_added_dbs():
     client, db = get_connection()
@@ -82,6 +90,7 @@ def delete_added_dbs():
     for document in ts_cursor.find({}):
         for n_db_name in [get_sch_db_name(document), get_rt_db_name(document)]:
             client.drop_database(n_db_name)
+
 
 if __name__ == "__main__":
     # os.makedirs("schedules/zips", exist_ok=True)
