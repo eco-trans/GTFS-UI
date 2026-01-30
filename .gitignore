@@ -2,7 +2,7 @@
 *.ipynb
 *.docx
 
-/docs
+# /docs
 /delay
 /ideas
 
