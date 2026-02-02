@@ -243,6 +243,26 @@ body {
     background: #fff;
 }
 
+.polygon-opacity-control {
+    padding: 6px 0;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 30px;
+    height: 120px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.polygon-opacity-control input[type="range"] {
+    width: 90px;
+    transform: rotate(-90deg);
+}
+
 .map-legend {
     font-size: 0.82rem;
     color: #2c3e50;

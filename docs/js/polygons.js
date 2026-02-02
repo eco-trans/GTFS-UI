@@ -40,7 +40,7 @@ window.initPolygonsLayer = function () {
                 color: '#666',
                 weight: 1,
                 fillColor: gid ? colorForPolygonMean(gid) : '#d7dde5',
-                fillOpacity: 0.55,
+                fillOpacity: window.polygonOpacity ?? 0.55,
             };
         },
         onEachFeature: (feature, layer) => {

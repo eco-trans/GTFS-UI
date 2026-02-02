@@ -22,6 +22,7 @@ window.initMap = function () {
     window.polygonsLayer = L.layerGroup([], { pane: 'polygonsPane' }).addTo(window.map);
     window.routesLayerGroup = L.layerGroup([], { pane: 'routesPane' }).addTo(window.map);
     window.stopsLayerGroup = L.layerGroup([], { pane: 'stopsPane' }).addTo(window.map);
+    window.polygonOpacity = 0.55;
 
     addMapControls();
     addLegend();
@@ -169,6 +170,26 @@ function addMapControls() {
         },
     });
     window.map.addControl(new Control({ position: 'topleft' }));
+
+    const Opacity = L.Control.extend({
+        onAdd: function () {
+            const container = L.DomUtil.create('div', 'leaflet-bar polygon-opacity-control');
+            const input = L.DomUtil.create('input', '', container);
+            input.type = 'range';
+            input.min = '0';
+            input.max = '1';
+            input.step = '0.05';
+            input.value = String(window.polygonOpacity ?? 0.55);
+            input.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                window.polygonOpacity = isNaN(val) ? 0.55 : val;
+                updatePolygonOpacity();
+            };
+            L.DomEvent.disableClickPropagation(container);
+            return container;
+        },
+    });
+    window.map.addControl(new Opacity({ position: 'topleft' }));
 }
 
 window.toggleBaseMapStyle = function () {
@@ -205,6 +226,15 @@ window.toggleColorMode = function () {
     styleRoutesAndStopsForSelection();
     updateLegend();
 };
+
+function updatePolygonOpacity() {
+    if (!window.polygonsLayer) return;
+    window.polygonsLayer.eachLayer((layer) => {
+        if (layer && layer.setStyle) {
+            layer.setStyle({ fillOpacity: window.polygonOpacity });
+        }
+    });
+}
 
 let legendControl = null;
 function addLegend() {
