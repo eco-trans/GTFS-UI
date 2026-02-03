@@ -303,6 +303,7 @@ async def stream_rt_data():
                 else:
                     headers = None
 
+                
                 try:
                     response = fetch_rt_feed(url, headers, session)
                     responses.append(response)
