@@ -174,13 +174,15 @@ window.styleRoutesAndStopsForSelection = function () {
             window.colorMode === 'otp'
                 ? getStopOtpColor(sid, activeRouteSet, stopOtpRange)
                 : getStopDelayColor(sid, activeRouteSet, stopDelayRange);
+        const hasData = colorVal != null;
         const baseFill = colorVal || '#3498db';
+        const showAsUnselected = !hasData && !isSelectedStop;
         entry.marker.setStyle({
-            radius: isSelectedStop ? 11 : isOnSelected ? 9 : 6,
-            fillOpacity: isSelectedStop ? 0.95 : isOnSelected ? 0.9 : 0.6,
-            color: isSelectedStop ? '#e74c3c' : isOnSelected ? '#34495e' : '#bdc3c7',
-            fillColor: isSelectedStop ? '#e74c3c' : isOnSelected ? baseFill : '#ecf0f1',
-            weight: isSelectedStop ? 1 : isOnSelected ? 0.6 : 0,
+            radius: isSelectedStop ? 11 : showAsUnselected ? 6 : isOnSelected ? 9 : 6,
+            fillOpacity: isSelectedStop ? 0.95 : showAsUnselected ? 0.6 : isOnSelected ? 0.9 : 0.6,
+            color: isSelectedStop ? '#e74c3c' : showAsUnselected ? '#bdc3c7' : isOnSelected ? '#34495e' : '#bdc3c7',
+            fillColor: isSelectedStop ? '#e74c3c' : showAsUnselected ? '#ecf0f1' : isOnSelected ? baseFill : '#ecf0f1',
+            weight: isSelectedStop ? 1 : showAsUnselected ? 0 : isOnSelected ? 0.6 : 0,
         });
         if (entry.marker.bringToFront) entry.marker.bringToFront();
     });
