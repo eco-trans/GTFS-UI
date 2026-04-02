@@ -5,6 +5,7 @@ gtfs_realtime_pb2.py
 .venv
 act.bat
 /schedules
+/logs
 /__pycache__
 /protoc-32.1-win64
 doc/~$nopsis.docx

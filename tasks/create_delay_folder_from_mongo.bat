@@ -7,3 +7,6 @@ CD "C:\Users\muk0003\OneDrive - Auburn University\Desktop\Realtime-Transit-Datab
 REM Your commands after activation
 python main.py
 python create_files.py
+git add meta
+git commit -m "Update delay folder from MongoDB"
+git push origin main
