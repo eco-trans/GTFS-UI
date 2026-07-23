@@ -1,1 +1,1 @@
-CreateObject("Wscript.Shell").Run chr(34) & "C:\Users\muk0003\OneDrive - Auburn University\Desktop\Realtime-Transit-Database\tasks\upload_delay_data.bat" & chr(34), 0, True
+CreateObject("Wscript.Shell").Run chr(34) & "D:\Projects\GTFS\tasks\upload_delay_data.bat" & chr(34), 0, True

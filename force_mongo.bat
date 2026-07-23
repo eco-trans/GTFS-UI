@@ -1,0 +1,1 @@
+mongod --port 27019 --dbpath "D:\MongoDB\GTFS_DAT"

@@ -1,6 +1,6 @@
 @echo off
 REM Change the current directory to the directory where this batch file is located
-CD C:\Users\muk0003\OneDrive - Auburn University\Desktop\Realtime-Transit-Database
+CD /d D:\Projects\GTFS
 
 CALL .venv\Scripts\activate
 REM Your commands after activation

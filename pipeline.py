@@ -86,7 +86,7 @@ async def get_schedules():
         try:
             await asyncio.gather(*tasks)
         except Exception as e:
-            logging.error(f"Error collecting data for {_id} error message: \n{e}\n")
+            logging.error(f"Error collecting SCH data for {_id}\n")
 
     client.close()
     return schedule_urls
@@ -117,8 +117,34 @@ def extract_schedule(_id, operator):
     try:
         with zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(dir_path)
+
+        if len(glob(os.path.join(dir_path, "*.txt"))) == 0:
+            txts = glob(os.path.join(dir_path, "*", "*.txt"))
+            if len(txts)>0:
+                for txt_path in txts:
+                    shutil.move(txt_path, dir_path)
+            
+                for useless_dir_path in os.listdir(dir_path):
+                    try:
+                        if ".txt" not in useless_dir_path:
+                            shutil.rmtree(os.path.join(dir_path, useless_dir_path), onerror=make_writable)
+                    except:
+                        pass # probably a zip
+            else:
+                zips = glob(os.path.join(dir_path, "*.zip"))
+                for zipped_path in zips:
+                    if "bus" in zipped_path:
+                        try:
+                            with zipfile.ZipFile(zipped_path, "r") as zip_ref:
+                                zip_ref.extractall(dir_path)
+                        except:
+                            pass
+                    os.remove(zipped_path)
+        
     except:
         print("Name: ", name, " is corrupted")
+    
+
 
 
 async def insert_frame(db, collection_name, frame: pd.DataFrame):
@@ -265,7 +291,7 @@ async def fetch_rt_feed(url, headers, session):
             return await response.read()
 
 
-async def stream_rt_data():
+async def stream_rt_data(ignore=[], only=[]):
     client, db = await get_async_connection()
     ts_name = os.getenv("METADATA_COLLECTION_NAME")  # ts stands for transit systems
     ts_cursor = db[ts_name]
@@ -274,12 +300,20 @@ async def stream_rt_data():
     db_names = []
     async with aiohttp.ClientSession() as session:
         async for transit_system in ts_cursor.find({}):
+            if transit_system.get("region").lower() in [i.lower() for i in ignore]:
+                # print(transit_system.get("region").lower())
+                continue
+            if len(only) > 0 and transit_system.get("region").lower() not in [i.lower() for i in only]:
+                continue
+            # print(transit_system.get("region").lower())
+            
             data = transit_system.get("realtime")
             is_key_needed = transit_system.get("rt_needs_key")
             is_oid_needed = transit_system.get("rt_needs_oid")
 
             api_key = transit_system.get("api_key")
             agency = transit_system.get("agency")
+
 
             for var_name, link in data.items():
                 if len(link) == 0:
@@ -303,17 +337,25 @@ async def stream_rt_data():
                 else:
                     headers = None
 
-                
                 try:
                     response = fetch_rt_feed(url, headers, session)
                     responses.append(response)
                     db_names.append(get_rt_db_name(transit_system, var_name))
                 except Exception as e:
                     logging.error(
-                        f"Error collecting data for {transit_system.get('region')} error message: \n{e}\n"
+                        f"Error collecting RT data for {transit_system.get('region')}\n"
                     )
 
-        responses = await asyncio.gather(*responses)
+        responses = await asyncio.gather(*responses, return_exceptions=True)
+
+        for r in responses:
+            if not isinstance(r, Exception):
+                continue
+            logging.error(
+                        f"Error collecting RT data for {r}\n"
+                    )
+
+        responses = [r for r in responses if not isinstance(r, Exception)]
 
     for db_name, response in zip(db_names, responses):
         feed = gtfs_realtime_pb2.FeedMessage()
@@ -342,8 +384,13 @@ async def stream_rt_data():
             # logging.info(f"len: {len(n_entity)}")
             await collection.insert_one(n_entity)
 
-
-
 if __name__ == "__main__":
     # asyncio.run(update_schedules())
     asyncio.run(stream_rt_data())
+
+
+# "realtime": {
+#     "trip_updates": "https://ctabustracker.com/gtfsrt/trips",
+#     "vehicle_positions": "https://ctabustracker.com/gtfsrt/vehicles",
+#     "alerts": "https://ctabustracker.com/gtfsrt/alerts"
+#   }

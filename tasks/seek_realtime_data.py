@@ -17,4 +17,4 @@ from pipeline import stream_rt_data
 
 
 if __name__ == "__main__":
-    asyncio.run(stream_rt_data())
+    asyncio.run(stream_rt_data(ignore=["chicago"]))

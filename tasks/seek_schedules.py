@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from pipeline import *
+
 logging.basicConfig(
     filename="logs/app.log",
     level=logging.INFO,  # Minimum logging level to record (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL)
