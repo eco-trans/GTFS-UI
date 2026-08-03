@@ -1,0 +1,11 @@
+*.py
+*.ipynb
+*.docx
+
+
+# /docs
+/delay
+/ideas
+
+done_dates.json
+meta/taz.zip
