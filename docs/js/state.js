@@ -9,7 +9,7 @@ window.cityConfig = {
 
 };
 window.currentCity = 'san_francisco';
-window.BASE_META_URL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/meta/${window.currentCity}`;
+window.BASE_META_URL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/master/meta/${window.currentCity}`;
 
 window.STOP_LOCATION_URL = `${window.BASE_META_URL}/stop_location.json`;
 window.ROUTES_METADATA_URL = `${window.BASE_META_URL}/routes_metadata.json`;
