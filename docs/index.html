@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +12,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div class="dashboard-container">
         <div class="map-container">
@@ -24,14 +26,22 @@
                 <!-- <p></p> -->
                 <label for="city-select" style="font-weight:600; font-size:0.82rem;">City</label>
                 <select id="city-select">
-                    <option value="san_francisco" selected>San Francisco</option>
                     <option value="atlanta">Atlanta</option>
-                    <option value="new_york_city">New York</option>
-                    <option value="salt_lake_city">Salt Lake City</option>
-                    <option value="portland">Portland</option>
+                    <option value="auburn">Auburn</option>
+                    <option value="austin">Austin</option>
+                    <option value="boston">Boston</option>
+                    <option value="chicago">Chicago</option>
+                    <option value="columbus">Columbus</option>
+                    <option value="houston">Houston</option>
                     <option value="los_angeles">Los Angeles</option>
-
-
+                    <option value="miami">Miami</option>
+                    <option value="new_york_city">New York</option>
+                    <option value="philadelphia">Philadelphia</option>
+                    <option value="portland">Portland</option>
+                    <option value="salt_lake_city">Salt Lake City</option>
+                    <option value="san_francisco" selected>San Francisco</option>
+                    <option value="toronto">Toronto</option>
+                    <option value="vancouver">Vancouver</option>
                 </select>
                 <div class="status-line">
                     <span id="selected-polygon-label" class="status-pill">Area: none</span>
@@ -43,8 +53,10 @@
                     <div class="header-row">
                         <h3>Routes in selected area</h3>
                         <div class="header-actions">
-                            <button id="route-info-btn" class="pill-button pill-button-compact" disabled>Route info</button>
-                            <button id="stop-info-btn" class="pill-button pill-button-compact" disabled>Stop info</button>
+                            <button id="route-info-btn" class="pill-button pill-button-compact" disabled>Route
+                                info</button>
+                            <button id="stop-info-btn" class="pill-button pill-button-compact" disabled>Stop
+                                info</button>
                         </div>
                     </div>
                     <div id="route-list" class="pill-list"></div>
@@ -99,4 +111,5 @@
     <script defer src="js/charts.js"></script>
     <script defer src="js/main.js"></script>
 </body>
+
 </html>
