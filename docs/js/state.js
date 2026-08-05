@@ -76,7 +76,7 @@ window.metaLoaded = false;
 window.setCity = function (cityKey) {
     if (!window.cityConfig[cityKey]) return;
     window.currentCity = cityKey;
-    window.BASE_META_URL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/main/meta/${window.currentCity}`;
+    window.BASE_META_URL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/master/meta/${window.currentCity}`;
     window.STOP_LOCATION_URL = `${window.BASE_META_URL}/stop_location.json`;
     window.ROUTES_METADATA_URL = `${window.BASE_META_URL}/routes_metadata.json`;
     window.STOPS_METADATA_URL = `${window.BASE_META_URL}/stops_metadata.json`;
