@@ -1,13 +1,23 @@
 ﻿// Shared constants and global state
 window.cityConfig = {
-    san_francisco: { label: 'San Francisco', center: [37.7749, -122.4194], zoom: 12 },
     atlanta: { label: 'Atlanta', center: [33.749, -84.388], zoom: 12 },
-    new_york_city: { label: 'New York', center: [40.7128, -74.006], zoom: 12 },
-    salt_lake_city: { label: 'Salt Lake City', center: [40.7608, -111.891], zoom: 12 },
-    portland: { label: 'Portland', center: [45.510106, -122.680744], zoom: 12 },
+    auburn: { label: 'Auburn', center: [32.6099, -85.4808], zoom: 12 },
+    austin: { label: 'Austin', center: [30.2672, -97.7431], zoom: 12 },
+    boston: { label: 'Boston', center: [42.3601, -71.0589], zoom: 12 },
+    chicago: { label: 'Chicago', center: [41.8781, -87.6298], zoom: 12 },
+    columbus: { label: 'Columbus', center: [39.9612, -82.9988], zoom: 12 },
+    houston: { label: 'Houston', center: [29.7604, -95.3698], zoom: 12 },
     los_angeles: { label: 'Los Angeles', center: [34.023457, -118.248732], zoom: 12 },
-
+    miami: { label: 'Miami', center: [25.7617, -80.1918], zoom: 12 },
+    new_york_city: { label: 'New York', center: [40.7128, -74.006], zoom: 12 },
+    philadelphia: { label: 'Philadelphia', center: [39.9526, -75.1652], zoom: 12 },
+    portland: { label: 'Portland', center: [45.510106, -122.680744], zoom: 12 },
+    salt_lake_city: { label: 'Salt Lake City', center: [40.7608, -111.891], zoom: 12 },
+    san_francisco: { label: 'San Francisco', center: [37.7749, -122.4194], zoom: 12 },
+    toronto: { label: 'Toronto', center: [43.6532, -79.3832], zoom: 12 },
+    vancouver: { label: 'Vancouver', center: [49.2827, -123.1207], zoom: 12 }
 };
+
 window.currentCity = 'san_francisco';
 window.BASE_META_URL = `https://raw.githubusercontent.com/eco-trans/GTFS-UI/refs/heads/master/meta/${window.currentCity}`;
 
