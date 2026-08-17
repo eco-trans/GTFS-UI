@@ -117,8 +117,8 @@ function renderLineChartWithBand(canvasId, labels, seriesVals, bandVals, label) 
                 {
                     label,
                     data: seriesVals,
-                    borderWidth: 2,
-                    pointRadius: 3,
+                    borderWidth: 1,
+                    pointRadius: 1,
                     fill: false,
                     tension: 0.25,
                     borderColor: '#3498db',
