@@ -5,7 +5,7 @@ window.initMap = function () {
     window.baseLayerColor = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
     });
-    window.baseLayerGray = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    window.baseLayerGray = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_2cs3_1_e2228084fc9fb2e634d58989', {
         attribution: '&copy; OpenStreetMap contributors & Carto',
     });
     window.baseLayerGray.addTo(window.map);
