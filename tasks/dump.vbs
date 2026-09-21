@@ -1,0 +1,1 @@
+CreateObject("Wscript.Shell").Run chr(34) & "D:\Projects\GTFS\tasks\dump.bat" & chr(34), 0, True

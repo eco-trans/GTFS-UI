@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import time
 import pytz
+from tqdm import tqdm
 
 from initialize_db import get_connection
 
@@ -406,6 +407,10 @@ if __name__ == "__main__":
         client.close()
 
         print(f"{len(all_dates)=}")
+
+        # if city == "austin":
+        #     for proc_date in tqdm(all_dates):
+        #         process_date([city, proc_date])
 
         with multiprocessing.Pool(processes=5) as pool:
             res = pool.map(
